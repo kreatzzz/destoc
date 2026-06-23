@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SandboxRunStatus {
+  QUEUED
+  PROVISIONING
+  BUILDING
+  READY
+  FAILED
+  STOPPED
+}
+
+enum ReviewStatus {
+  DRAFT
+  RUNNING
+  READY
+  FAILED
+}
+
+enum ReviewScope {
+  COMPONENT
+  PAGE
+}
+
+enum SuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  FAILED
+}
+
+enum RevisionStatus {
+  QUEUED
+  APPLYING
+  READY
+  FAILED
+}
+
+enum AssetKind {
+  SCREENSHOT_BEFORE
+  SCREENSHOT_AFTER
+  ELEMENT_CROP
+  PAGE_SCREENSHOT
+  LOG
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  workspaces    Workspace[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@unique([providerId, accountId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Workspace {
+  id        String    @id @default(cuid())
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Project {
+  id              String       @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  githubUrl       String
+  repositoryOwner String
+  repositoryName  String
+  defaultBranch   String       @default("main")
+  pinnedCommitSha String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  sandboxRuns     SandboxRun[]
+  reviewTargets   ReviewTarget[]
+  reviews         Review[]
+  revisions       Revision[]
+  assets          Asset[]
+
+  @@unique([workspaceId, repositoryOwner, repositoryName])
+  @@index([workspaceId, updatedAt])
+}
+
+model SandboxRun {
+  id            String           @id @default(cuid())
+  projectId     String
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status        SandboxRunStatus @default(QUEUED)
+  commitSha     String?
+  previewUrl    String?
+  logs          String?
+  errorCode     String?
+  errorMessage  String?
+  startedAt     DateTime?
+  stoppedAt     DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  reviewTargets ReviewTarget[]
+  revisions     Revision[]
+
+  @@index([projectId, createdAt])
+  @@index([status])
+}
+
+model ReviewTarget {
+  id             String      @id @default(cuid())
+  projectId      String
+  project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sandboxRunId   String?
+  sandboxRun     SandboxRun? @relation(fields: [sandboxRunId], references: [id], onDelete: SetNull)
+  pageUrl        String
+  sourceFilePath String?
+  domContext     Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  element        SelectedElement?
+  reviews        Review[]
+
+  @@index([projectId, createdAt])
+  @@index([sandboxRunId])
+}
+
+model SelectedElement {
+  id              String       @id @default(cuid())
+  reviewTargetId  String       @unique
+  reviewTarget    ReviewTarget @relation(fields: [reviewTargetId], references: [id], onDelete: Cascade)
+  selector        String
+  role            String?
+  text            String?
+  domPath         Json
+  computedStyles  Json
+  boundingBox     Json
+  classNames      String[]
+  screenshotAsset Asset?       @relation("ElementCrop")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Review {
+  id              String       @id @default(cuid())
+  projectId       String
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reviewTargetId  String
+  reviewTarget    ReviewTarget @relation(fields: [reviewTargetId], references: [id], onDelete: Cascade)
+  scope           ReviewScope
+  status          ReviewStatus @default(DRAFT)
+  provider        String
+  prompt          String?
+  result          Json?
+  errorCode       String?
+  errorMessage    String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  suggestions     Suggestion[]
+
+  @@index([projectId, createdAt])
+  @@index([reviewTargetId])
+  @@index([status])
+}
+
+model Suggestion {
+  id                  String           @id @default(cuid())
+  reviewId            String
+  review              Review           @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  status              SuggestionStatus @default(PENDING)
+  severity            String
+  confidence          Float
+  title               String
+  issue               String
+  rationale           String
+  intendedOutcome     String
+  patch               String?
+  verificationChecklist Json?
+  rejectionReason     String?
+  errorCode           String?
+  errorMessage        String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  revision            Revision?
+
+  @@index([reviewId, createdAt])
+  @@index([status])
+}
+
+model Revision {
+  id                  String         @id @default(cuid())
+  projectId           String
+  project             Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suggestionId        String         @unique
+  suggestion          Suggestion     @relation(fields: [suggestionId], references: [id], onDelete: Restrict)
+  sandboxRunId        String?
+  sandboxRun          SandboxRun?    @relation(fields: [sandboxRunId], references: [id], onDelete: SetNull)
+  status              RevisionStatus @default(QUEUED)
+  patch               String
+  errorCode           String?
+  errorMessage        String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  beforeScreenshot    Asset?         @relation("BeforeScreenshot")
+  afterScreenshot     Asset?         @relation("AfterScreenshot")
+
+  @@index([projectId, createdAt])
+  @@index([sandboxRunId])
+}
+
+model Asset {
+  id                String            @id @default(cuid())
+  projectId         String
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind              AssetKind
+  storageKey        String            @unique
+  contentType       String
+  byteSize          Int?
+  createdAt         DateTime          @default(now())
+  selectedElementId String?           @unique
+  selectedElement   SelectedElement?  @relation("ElementCrop", fields: [selectedElementId], references: [id], onDelete: SetNull)
+  beforeRevisionId  String?           @unique
+  beforeRevision    Revision?         @relation("BeforeScreenshot", fields: [beforeRevisionId], references: [id], onDelete: SetNull)
+  afterRevisionId   String?           @unique
+  afterRevision     Revision?         @relation("AfterScreenshot", fields: [afterRevisionId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, kind, createdAt])
+}

@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+
+import { githubRepositoryUrlSchema, selectedElementSchema } from "@/lib/schemas";
+
+describe("githubRepositoryUrlSchema", () => {
+  it("normalizes a public GitHub repository URL", () => {
+    expect(githubRepositoryUrlSchema.parse("https://github.com/acme/design-system.git/")).toEqual({
+      url: "https://github.com/acme/design-system",
+      owner: "acme",
+      repository: "design-system",
+    });
+  });
+
+  it("rejects a non-GitHub URL", () => {
+    expect(() => githubRepositoryUrlSchema.parse("https://example.com/acme/design-system")).toThrow(
+      "Only public HTTPS GitHub repository URLs are supported.",
+    );
+  });
+
+  it("rejects URLs that do not identify exactly one repository", () => {
+    expect(() => githubRepositoryUrlSchema.parse("https://github.com/acme/design-system/issues")).toThrow(
+      "Use a repository URL",
+    );
+  });
+});
+
+describe("selectedElementSchema", () => {
+  it("accepts bounded bridge context", () => {
+    expect(selectedElementSchema.parse({
+      selector: "[data-design-id='hero']",
+      role: "heading",
+      domPath: ["main", "section", "h1"],
+      computedStyles: { fontSize: "48px" },
+      boundingBox: { x: 10, y: 10, width: 400, height: 120 },
+      classNames: ["text-5xl"],
+    }).role).toBe("heading");
+  });
+});
