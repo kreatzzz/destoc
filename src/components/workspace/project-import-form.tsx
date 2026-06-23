@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { createProjectAction, type WorkspaceFormState } from "@/app/(workspace)/actions";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,11 @@ const initialState: WorkspaceFormState = { ok: false };
 
 export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
   const [state, action, isPending] = useActionState(createProjectAction, initialState);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state.ok && state.projectId) router.push(`/workspace/${state.projectId}`);
+  }, [router, state.ok, state.projectId]);
 
   return (
     <form action={action} className="grid gap-4 rounded-xl border bg-card p-5">
@@ -28,7 +34,7 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
         <Input id="branch" name="defaultBranch" defaultValue="main" maxLength={255} />
       </div>
       {state.message ? <p role="alert" className="text-sm text-destructive">{state.message}</p> : null}
-      {state.ok ? <p role="status" className="text-sm text-emerald-400">Repository imported. It is ready to open.</p> : null}
+      {state.ok ? <p role="status" className="text-sm text-emerald-400">Repository imported. Opening workspace…</p> : null}
       <Button type="submit" disabled={isPending}>{isPending ? "Importing…" : "Import repository"}</Button>
     </form>
   );

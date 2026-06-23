@@ -46,6 +46,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
       impact: suggestion.severity === "high" ? "High impact" : suggestion.severity === "medium" ? "Medium impact" : "Low impact",
       status: toSuggestionStatus(suggestion.status),
     })),
+    previewUrl: project.sandboxRuns[0]?.previewUrl ?? undefined,
   };
 
   return <DesignWorkspace data={data} />;

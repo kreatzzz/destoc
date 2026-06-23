@@ -56,7 +56,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     <WorkspaceHeader project={data.project} />
     <div className="flex min-h-0 flex-1">
       <ProjectNavigation data={data} activeRevisionId={activeRevisionId} onRevisionChange={setActiveRevisionId} />
-      <CanvasPreview designMode={designMode} onDesignModeChange={setDesignMode} />
+      <CanvasPreview designMode={designMode} previewUrl={data.previewUrl} onDesignModeChange={setDesignMode} onSelectionChange={() => undefined} />
       <ReviewInspector
         suggestion={suggestion}
         onSuggestionStatusChange={decideSuggestion}

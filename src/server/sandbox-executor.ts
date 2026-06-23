@@ -1,6 +1,7 @@
 import { Sandbox } from "@vercel/sandbox";
 import { AppError, asAppError } from "@/lib/errors";
 import { requireProjectOwnership } from "@/server/authorization";
+import { createPreviewBridgeProxyScript } from "@/server/preview-bridge";
 import { transitionSandboxRun } from "@/server/sandbox-runs";
 
 const SANDBOX_TIMEOUT_MS = 15 * 60 * 1_000;
@@ -44,8 +45,7 @@ async function commandLog(command: { output(stream?: "stdout" | "stderr" | "both
   return truncateLog(await command.output("both"));
 }
 
-async function waitForPreview(sandbox: Sandbox): Promise<string | undefined> {
-  const ports = [3000, 5173] as const;
+async function waitForPreview(sandbox: Sandbox, ports: readonly number[]): Promise<{ url: string; port: number } | undefined> {
   const deadline = Date.now() + 15_000;
 
   while (Date.now() < deadline) {
@@ -57,7 +57,7 @@ async function waitForPreview(sandbox: Sandbox): Promise<string | undefined> {
           signal: AbortSignal.timeout(2_000),
           redirect: "follow",
         });
-        if (response.ok) return url;
+        if (response.ok) return { url, port };
       } catch {
         // The dev server may not have bound the port yet; keep polling.
       }
@@ -67,6 +67,53 @@ async function waitForPreview(sandbox: Sandbox): Promise<string | undefined> {
   }
 
   return undefined;
+}
+
+/**
+ * Health-check the application over loopback so raw framework ports never
+ * need public Sandbox routes. Only the injection proxy is externally exposed.
+ */
+async function waitForLocalPreview(sandbox: Sandbox, ports: readonly number[]): Promise<number | undefined> {
+  const deadline = Date.now() + 15_000;
+
+  while (Date.now() < deadline) {
+    for (const port of ports) {
+      const check = await sandbox.runCommand({
+        cmd: "node",
+        args: [
+          "-e",
+          `fetch(\"http://127.0.0.1:${port}\", { redirect: \"follow\", signal: AbortSignal.timeout(2000) }).then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))`,
+        ],
+        timeoutMs: 3_000,
+      });
+      if (check.exitCode === 0) return port;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+
+  return undefined;
+}
+
+async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
+  const bridgePath = `${sandbox.cwd}/.destoc-preview-bridge.cjs`;
+  await sandbox.fs.writeFile(bridgePath, createPreviewBridgeProxyScript(upstreamPort), "utf8");
+
+  await sandbox.runCommand({
+    cmd: "node",
+    args: [bridgePath],
+    detached: true,
+    timeoutMs: PREVIEW_START_TIMEOUT_MS,
+  });
+
+  const proxy = await waitForPreview(sandbox, [3001]);
+  if (!proxy) {
+    throw new AppError("INTERNAL_ERROR", "Sandbox preview bridge did not start.", {
+      expose: false,
+    });
+  }
+
+  return proxy.url;
 }
 
 /**
@@ -99,7 +146,9 @@ export async function executeSandboxRun(
         depth: 1,
         revision: input.commitSha ?? project.defaultBranch,
       },
-      ports: [3000, 5173],
+      // Only the Destoc-owned reverse proxy is publicly exposed. The user app
+      // remains reachable solely over localhost inside the VM.
+      ports: [3001],
       runtime: "node24",
       env: { NODE_ENV: "development" },
       resources: { vcpus: 1 },
@@ -147,16 +196,18 @@ export async function executeSandboxRun(
       timeoutMs: PREVIEW_START_TIMEOUT_MS,
     });
 
-    const previewUrl = await waitForPreview(sandbox);
-    if (!previewUrl) {
+    const upstreamPort = await waitForLocalPreview(sandbox, [3000, 5173]);
+    if (!upstreamPort) {
       throw new AppError("INTERNAL_ERROR", "Sandbox preview did not start on a supported port.", {
         expose: false,
       });
     }
 
+    const previewUrl = await startPreviewBridge(sandbox, upstreamPort);
+
     return transitionSandboxRun(userId, input.sandboxRunId, "READY", {
       previewUrl,
-      logs: truncateLog(`${logs}\nPreview ready at ${previewUrl}`),
+      logs: truncateLog(`${logs}\nPreview bridge ready at ${previewUrl} (upstream port ${upstreamPort})`),
     });
   } catch (error) {
     const appError = asAppError(error);

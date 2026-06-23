@@ -9,6 +9,7 @@ import { createProject, createWorkspace } from "@/server";
 export type WorkspaceFormState = {
   ok: boolean;
   message?: string;
+  projectId?: string;
 };
 
 export async function createWorkspaceAction(
@@ -32,13 +33,13 @@ export async function createProjectAction(
 ): Promise<WorkspaceFormState> {
   try {
     const user = await requireCurrentUser();
-    await createProject(user.id, {
+    const project = await createProject(user.id, {
       workspaceId: formData.get("workspaceId"),
       githubUrl: formData.get("githubUrl"),
       defaultBranch: formData.get("defaultBranch") || "main",
     });
     revalidatePath("/workspace");
-    return { ok: true };
+    return { ok: true, projectId: project.id };
   } catch (error) {
     const appError = asAppError(error);
     return { ok: false, message: appError.expose ? appError.message : "Could not import the repository." };

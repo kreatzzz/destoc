@@ -30,4 +30,5 @@ export interface WorkspaceData {
   project: WorkspaceProject;
   revisions: WorkspaceRevision[];
   suggestions: WorkspaceSuggestion[];
+  previewUrl?: string;
 }
