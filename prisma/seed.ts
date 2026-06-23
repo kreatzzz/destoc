@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { hashPassword } from "better-auth/crypto";
 import { getPrisma } from "../src/lib/db";
 

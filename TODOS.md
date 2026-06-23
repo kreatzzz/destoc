@@ -19,3 +19,4 @@
 - [x] Implement authenticated ownership, persistent project/review/revision models, and seeded demo data.
 - [x] Implement public repository validation, sandbox lifecycle APIs, mock reviews, patch restrictions, and persisted decisions.
 - [x] Build the desktop three-pane workspace, lightweight auth entry flow, loading/empty/error states, rate limits, tests, and environment documentation.
+- [x] Provide a local Docker PostgreSQL service, committed initial migration, and seedable demo account.

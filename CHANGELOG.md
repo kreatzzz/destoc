@@ -14,6 +14,7 @@ All notable project decisions and changes are recorded here.
 - Public GitHub URL validation, safe patch-path validation, structured mock design-review provider, API routes, and production rate-limit policy.
 - Three-pane design workspace inspired by developer review tools, plus sign-in/sign-up, workspace onboarding, project import, loading, empty, and error states.
 - Vitest coverage for GitHub source validation, selected-element payload bounds, and patch safety.
+- Docker Compose PostgreSQL development service, initial Prisma migration, and automatic `.env` loading for Prisma commands and seeds.
 
 ### Deferred
 
