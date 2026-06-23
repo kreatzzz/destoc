@@ -12,9 +12,12 @@ interface CanvasPreviewProps {
   previewUrl?: string;
   onDesignModeChange: (enabled: boolean) => void;
   onSelectionChange: (selection: { selector: string }) => void;
+  onStartPreview: () => void;
+  isStartingPreview: boolean;
+  previewError: string | null;
 }
 
-export function CanvasPreview({ designMode, previewUrl, onDesignModeChange, onSelectionChange }: CanvasPreviewProps) {
+export function CanvasPreview({ designMode, previewUrl, onDesignModeChange, onSelectionChange, onStartPreview, isStartingPreview, previewError }: CanvasPreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   useEffect(() => {
     if (!previewUrl) return;
@@ -49,7 +52,8 @@ export function CanvasPreview({ designMode, previewUrl, onDesignModeChange, onSe
       <div className="relative min-h-0 flex-1 overflow-auto p-5 lg:p-8">
         <div className="absolute inset-0 opacity-[0.18]" style={{ backgroundImage: "radial-gradient(#6d6c65 0.7px, transparent 0.7px)", backgroundSize: "16px 16px" }} />
         <div className="relative mx-auto min-h-[590px] w-full max-w-[900px] overflow-hidden rounded-xl border border-white/[0.12] bg-[#f8f8f4] shadow-[0_25px_80px_rgba(0,0,0,0.36)]">
-          {previewUrl ? <iframe ref={iframeRef} title="Repository preview" src={previewUrl} className="h-[590px] w-full border-0 bg-white" /> : <>
+          {previewUrl ? <iframe ref={iframeRef} title="Repository preview" src={previewUrl} className="h-[590px] w-full border-0 bg-white" /> : <div className="grid min-h-[590px] place-items-center bg-zinc-950 p-8 text-center text-zinc-200"><div><h2 className="text-lg font-medium">Preview is not running</h2><p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">Start an isolated sandbox for this public repository to inspect its actual interface.</p>{previewError ? <p role="alert" className="mt-3 max-w-sm text-sm text-rose-300">{previewError}</p> : null}<Button className="mt-5" onClick={onStartPreview} disabled={isStartingPreview}>{isStartingPreview ? "Starting preview…" : "Start preview"}</Button></div></div>}
+          {false && <>
           <div className="flex h-10 items-center justify-between border-b border-black/[0.08] bg-white px-4 text-[10px] text-zinc-500">
             <span className="font-semibold tracking-[-0.02em] text-zinc-900">axis / objects</span>
             <div className="flex items-center gap-4"><span>About</span><span>Objects</span><span>Journal</span><span className="rounded-full bg-zinc-900 px-2.5 py-1 text-white">Visit gallery</span></div>

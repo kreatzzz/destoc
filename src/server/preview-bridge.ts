@@ -75,13 +75,13 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
 
   function escapeSelector(value) {
     if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(value);
-    return value.replace(/[^a-zA-Z0-9_-]/g, "\\\\$&");
+    return value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
   }
 
   function segment(element) {
     const tag = element.tagName.toLowerCase();
     const testId = element.getAttribute("data-testid") || element.getAttribute("data-test");
-    if (testId) return tag + "[data-testid=\\\"" + escapeSelector(testId) + "\\\"]";
+    if (testId) return tag + "[data-testid=\"" + escapeSelector(testId) + "\"]";
     if (element.id) return tag + "#" + escapeSelector(element.id);
 
     const classNames = Array.from(element.classList)
@@ -136,7 +136,7 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   function selectedText(element) {
     const tag = element.tagName.toLowerCase();
     if (tag === "input" || tag === "textarea" || tag === "select" || element.isContentEditable) return "";
-    return (element.innerText || element.textContent || "").replace(/\\s+/g, " ").trim().slice(0, MAX_TEXT_LENGTH);
+    return (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_LENGTH);
   }
 
   function computedStyles(element) {
@@ -281,8 +281,8 @@ function responseHeaders(headers) {
 
 function injectBridge(body) {
   const html = body.toString("utf8");
-  const tag = "<script data-destoc-preview-bridge>" + BRIDGE + "<\\/script>";
-  const headClose = html.search(/<\\/head\\s*>/i);
+  const tag = "<script data-destoc-preview-bridge>" + BRIDGE + "</script>";
+  const headClose = html.search(/<\/head\s*>/i);
   if (headClose !== -1) return Buffer.from(html.slice(0, headClose) + tag + html.slice(headClose));
   return Buffer.from(tag + html);
 }
@@ -290,13 +290,13 @@ function injectBridge(body) {
 function proxyUpgrade(request, socket, head) {
   const upstream = net.connect(UPSTREAM_PORT, "127.0.0.1");
   upstream.once("connect", () => {
-    let handshake = request.method + " " + request.url + " HTTP/" + request.httpVersion + "\\r\\n";
+    let handshake = request.method + " " + request.url + " HTTP/" + request.httpVersion + "\r\n";
     for (let index = 0; index < request.rawHeaders.length; index += 2) {
       const key = request.rawHeaders[index];
       const value = request.rawHeaders[index + 1];
-      if (key.toLowerCase() !== "host") handshake += key + ": " + value + "\\r\\n";
+      if (key.toLowerCase() !== "host") handshake += key + ": " + value + "\r\n";
     }
-    upstream.write(handshake + "Host: 127.0.0.1:" + UPSTREAM_PORT + "\\r\\n\\r\\n");
+    upstream.write(handshake + "Host: 127.0.0.1:" + UPSTREAM_PORT + "\r\n\r\n");
     if (head.length) upstream.write(head);
     socket.pipe(upstream).pipe(socket);
   });
@@ -315,7 +315,7 @@ const server = http.createServer((request, response) => {
   }, (upstreamResponse) => {
     const headers = responseHeaders(upstreamResponse.headers);
     const contentType = String(upstreamResponse.headers["content-type"] || "");
-    const shouldInject = request.method !== "HEAD" && /(^|;)\\s*text\\/html\\b/i.test(contentType);
+    const shouldInject = request.method !== "HEAD" && /(^|;)\s*text\/html\b/i.test(contentType);
     if (!shouldInject) {
       response.writeHead(upstreamResponse.statusCode || 502, headers);
       upstreamResponse.pipe(response);

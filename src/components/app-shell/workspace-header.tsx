@@ -7,9 +7,11 @@ import type { WorkspaceProject } from "@/components/workspace/types";
 
 interface WorkspaceHeaderProps {
   project: WorkspaceProject;
+  onDisconnect: () => void;
+  isDisconnecting: boolean;
 }
 
-export function WorkspaceHeader({ project }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ project, onDisconnect, isDisconnecting }: WorkspaceHeaderProps) {
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.07] bg-[#111110] px-3 text-zinc-300">
       <div className="flex min-w-0 items-center gap-2">
@@ -27,6 +29,7 @@ export function WorkspaceHeader({ project }: WorkspaceHeaderProps) {
       </div>
 
       <div className="flex items-center gap-1">
+        <Button variant="ghost" size="sm" disabled={isDisconnecting} onClick={onDisconnect} className="text-zinc-500 hover:bg-rose-500/10 hover:text-rose-200">{isDisconnecting ? "Disconnecting…" : "Disconnect"}</Button>
         <Badge variant="outline" className="hidden border-emerald-400/20 bg-emerald-400/[0.07] text-[10px] font-medium text-emerald-300 sm:flex">
           <Cloud className="size-2.5" /> Preview live
         </Badge>

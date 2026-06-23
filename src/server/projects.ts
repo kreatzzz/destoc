@@ -75,6 +75,31 @@ export async function getProject(userId: string, projectId: string) {
   });
 }
 
+/**
+ * Disconnect a repository from a workspace and permanently remove all of its
+ * Destoc-owned records. Projects only store public GitHub metadata, so this
+ * never mutates the source repository on GitHub.
+ */
+export async function deleteProject(userId: string, projectId: string) {
+  await enforceRateLimit("mutation", userId);
+  const project = await requireProjectOwnership(projectId, userId);
+
+  try {
+    await getPrisma().project.delete({
+      where: { id: project.id },
+    });
+  } catch (error) {
+    // A concurrent delete after the ownership check should preserve the
+    // endpoint's not-found semantics instead of surfacing as a server error.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      throw new AppError("NOT_FOUND", "Project not found.", { cause: error });
+    }
+    throw error;
+  }
+
+  return { id: project.id };
+}
+
 export async function listProjects(userId: string, workspaceId: string) {
   await requireWorkspaceOwnership(workspaceId, userId);
 

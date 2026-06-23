@@ -24,6 +24,10 @@ interface DesignWorkspaceProps { data?: WorkspaceData; }
 export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const [activeRevisionId, setActiveRevisionId] = useState(data.revisions.find((revision) => revision.isActive)?.id ?? data.revisions[0]?.id ?? "");
   const [designMode, setDesignMode] = useState(true);
+  const [previewUrl, setPreviewUrl] = useState(data.previewUrl);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [isStartingPreview, startPreviewTransition] = useTransition();
+  const [isDisconnecting, startDisconnectTransition] = useTransition();
   const initialSuggestion = data.suggestions[0];
   const [suggestionStatus, setSuggestionStatus] = useState<ReviewStatus>(initialSuggestion?.status ?? "pending");
   const [decisionError, setDecisionError] = useState<string | null>(null);
@@ -52,11 +56,31 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     });
   }
 
+  function startPreview() {
+    setPreviewError(null);
+    startPreviewTransition(async () => {
+      const response = await fetch(`/api/projects/${data.project.id}/sandbox-runs`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const payload = await response.json().catch(() => null) as { sandboxRun?: { previewUrl?: string }; error?: { message?: string } } | null;
+      if (!response.ok || !payload?.sandboxRun?.previewUrl) { setPreviewError(payload?.error?.message ?? "Preview could not be started."); return; }
+      setPreviewUrl(payload.sandboxRun.previewUrl);
+      router.refresh();
+    });
+  }
+
+  function disconnectProject() {
+    if (!window.confirm(`Disconnect ${data.project.repository}? This deletes its Destoc reviews and revisions, not the GitHub repository.`)) return;
+    startDisconnectTransition(async () => {
+      const response = await fetch(`/api/projects/${data.project.id}`, { method: "DELETE" });
+      if (response.ok) router.push("/workspace");
+      else setPreviewError("Repository could not be disconnected.");
+    });
+  }
+
   return <div className="flex h-dvh min-h-[640px] flex-col overflow-hidden bg-[#131312] font-sans antialiased">
-    <WorkspaceHeader project={data.project} />
+    <WorkspaceHeader project={data.project} onDisconnect={disconnectProject} isDisconnecting={isDisconnecting} />
     <div className="flex min-h-0 flex-1">
       <ProjectNavigation data={data} activeRevisionId={activeRevisionId} onRevisionChange={setActiveRevisionId} />
-      <CanvasPreview designMode={designMode} previewUrl={data.previewUrl} onDesignModeChange={setDesignMode} onSelectionChange={() => undefined} />
+      <CanvasPreview designMode={designMode} previewUrl={previewUrl} onDesignModeChange={setDesignMode} onSelectionChange={() => undefined} onStartPreview={startPreview} isStartingPreview={isStartingPreview} previewError={previewError} />
       <ReviewInspector
         suggestion={suggestion}
         onSuggestionStatusChange={decideSuggestion}
