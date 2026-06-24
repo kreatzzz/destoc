@@ -23,6 +23,7 @@ All notable project decisions and changes are recorded here.
 - Repository import now accepts the seeded demo workspace ID; ownership enforcement remains the authorization boundary.
 - Workspace status now distinguishes a stopped preview from a live one.
 - Preview sessions now remain available for the maximum Hobby-safe runtime, recover stalled viewport motion in isolated previews, and provide working iframe reload and fullscreen controls.
+- A stale or expired preview can now be restarted directly from the preview toolbar.
 
 ### Deferred
 

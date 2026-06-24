@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Crosshair, Eye, Maximize2, Minimize2, MousePointer2, RefreshCw, Sparkles } from "lucide-react";
+import { Crosshair, Eye, Maximize2, Minimize2, MousePointer2, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,6 +95,7 @@ export function CanvasPreview({ designMode, previewUrl, onDesignModeChange, onSe
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/[0.06] px-3">
         <div className="flex items-center gap-2 text-xs text-zinc-500"><span className="size-1.5 rounded-full bg-emerald-400" /> localhost:3000</div>
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon-xs" aria-label="Restart sandbox preview" onClick={onStartPreview} disabled={!previewUrl || isStartingPreview} className="text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"><RotateCcw /></Button>
           <Button variant="ghost" size="icon-xs" aria-label="Refresh preview" onClick={refreshPreview} disabled={!previewUrl} className="text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"><RefreshCw /></Button>
           <Button variant="ghost" size="icon-xs" aria-label={isPreviewExpanded ? "Exit fullscreen preview" : "Expand preview"} onClick={() => void toggleFullscreen()} disabled={!previewUrl} className="text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100">{isPreviewExpanded ? <Minimize2 /> : <Maximize2 />}</Button>
           <div className="ml-1 h-4 w-px bg-white/[0.08]" />
