@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { githubRepositoryUrlSchema, selectedElementSchema } from "@/lib/schemas";
+import { createProjectSchema, githubRepositoryUrlSchema, selectedElementSchema } from "@/lib/schemas";
 
 describe("githubRepositoryUrlSchema", () => {
   it("normalizes a public GitHub repository URL", () => {
@@ -21,6 +21,18 @@ describe("githubRepositoryUrlSchema", () => {
     expect(() => githubRepositoryUrlSchema.parse("https://github.com/acme/design-system/issues")).toThrow(
       "Use a repository URL",
     );
+  });
+});
+
+describe("createProjectSchema", () => {
+  it("accepts the deterministic demo workspace ID", () => {
+    expect(
+      createProjectSchema.parse({
+        workspaceId: "destoc-demo-workspace",
+        githubUrl: "https://github.com/dey11/hanabi",
+        defaultBranch: "main",
+      }).workspaceId,
+    ).toBe("destoc-demo-workspace");
   });
 });
 

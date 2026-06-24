@@ -68,16 +68,21 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   }
 
   function disconnectProject() {
-    if (!window.confirm(`Disconnect ${data.project.repository}? This deletes its Destoc reviews and revisions, not the GitHub repository.`)) return;
+    if (!window.confirm(`Delete ${data.project.repository} from Destoc? This permanently deletes its Destoc reviews and revisions, but never the GitHub repository.`)) return;
     startDisconnectTransition(async () => {
       const response = await fetch(`/api/projects/${data.project.id}`, { method: "DELETE" });
       if (response.ok) router.push("/workspace");
-      else setPreviewError("Repository could not be disconnected.");
+      else setPreviewError("Project could not be deleted.");
     });
   }
 
   return <div className="flex h-dvh min-h-[640px] flex-col overflow-hidden bg-[#131312] font-sans antialiased">
-    <WorkspaceHeader project={data.project} onDisconnect={disconnectProject} isDisconnecting={isDisconnecting} />
+    <WorkspaceHeader
+      project={data.project}
+      onDisconnect={disconnectProject}
+      isDisconnecting={isDisconnecting}
+      hasPreview={Boolean(previewUrl)}
+    />
     <div className="flex min-h-0 flex-1">
       <ProjectNavigation data={data} activeRevisionId={activeRevisionId} onRevisionChange={setActiveRevisionId} />
       <CanvasPreview designMode={designMode} previewUrl={previewUrl} onDesignModeChange={setDesignMode} onSelectionChange={() => undefined} onStartPreview={startPreview} isStartingPreview={isStartingPreview} previewError={previewError} />

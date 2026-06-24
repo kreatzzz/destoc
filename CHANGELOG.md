@@ -15,6 +15,13 @@ All notable project decisions and changes are recorded here.
 - Three-pane design workspace inspired by developer review tools, plus sign-in/sign-up, workspace onboarding, project import, loading, empty, and error states.
 - Vitest coverage for GitHub source validation, selected-element payload bounds, and patch safety.
 - Docker Compose PostgreSQL development service, initial Prisma migration, and automatic `.env` loading for Prisma commands and seeds.
+- A visible destructive project deletion action that removes only Destoc-owned project data, never the GitHub repository.
+
+### Changed
+
+- Sandbox preview startup now permits required dependency lifecycle scripts inside the disposable VM, waits up to one minute for the server, and persists detached-server logs on failure.
+- Repository import now accepts the seeded demo workspace ID; ownership enforcement remains the authorization boundary.
+- Workspace status now distinguishes a stopped preview from a live one.
 
 ### Deferred
 

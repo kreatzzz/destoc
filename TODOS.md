@@ -3,7 +3,7 @@
 ## In progress
 
 - [ ] Configure a live DeepSeek provider and validate structured reviews against real component evidence.
-- [ ] Wire the production preview bridge and screenshot capture to the deployed Vercel Sandbox credentials.
+- [ ] Validate preview startup across framework/package-manager variants and add persisted screenshot capture.
 
 ## Deliberately deferred
 

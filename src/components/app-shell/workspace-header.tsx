@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, Cloud, MoreHorizontal, Sparkles } from "lucide-react";
+import { Bell, ChevronDown, Cloud, MoreHorizontal, Sparkles, Trash2 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -9,9 +9,10 @@ interface WorkspaceHeaderProps {
   project: WorkspaceProject;
   onDisconnect: () => void;
   isDisconnecting: boolean;
+  hasPreview: boolean;
 }
 
-export function WorkspaceHeader({ project, onDisconnect, isDisconnecting }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ project, onDisconnect, isDisconnecting, hasPreview }: WorkspaceHeaderProps) {
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.07] bg-[#111110] px-3 text-zinc-300">
       <div className="flex min-w-0 items-center gap-2">
@@ -29,9 +30,23 @@ export function WorkspaceHeader({ project, onDisconnect, isDisconnecting }: Work
       </div>
 
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="sm" disabled={isDisconnecting} onClick={onDisconnect} className="text-zinc-500 hover:bg-rose-500/10 hover:text-rose-200">{isDisconnecting ? "Disconnecting…" : "Disconnect"}</Button>
-        <Badge variant="outline" className="hidden border-emerald-400/20 bg-emerald-400/[0.07] text-[10px] font-medium text-emerald-300 sm:flex">
-          <Cloud className="size-2.5" /> Preview live
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={isDisconnecting}
+          onClick={onDisconnect}
+          className="gap-1.5 text-zinc-400 hover:bg-rose-500/10 hover:text-rose-200"
+        >
+          <Trash2 className="size-3.5" />
+          {isDisconnecting ? "Deleting…" : "Delete project"}
+        </Button>
+        <Badge
+          variant="outline"
+          className={hasPreview
+            ? "hidden border-emerald-400/20 bg-emerald-400/[0.07] text-[10px] font-medium text-emerald-300 sm:flex"
+            : "hidden border-white/10 bg-white/[0.03] text-[10px] font-medium text-zinc-500 sm:flex"}
+        >
+          <Cloud className="size-2.5" /> {hasPreview ? "Preview live" : "Preview stopped"}
         </Badge>
         <Button variant="ghost" size="icon-sm" aria-label="Notifications" className="text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100">
           <Bell />

@@ -35,7 +35,10 @@ export const githubRepositoryUrlSchema = z
   });
 
 export const createProjectSchema = z.object({
-  workspaceId: z.string().cuid(),
+  // Production records use CUIDs, but the deterministic demo workspace has a
+  // stable seeded ID. Ownership is still enforced server-side before a record
+  // can be created, so validation must accept every ID shape stored by Prisma.
+  workspaceId: z.string().trim().min(1).max(191),
   githubUrl: githubRepositoryUrlSchema,
   defaultBranch: z
     .string()

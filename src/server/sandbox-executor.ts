@@ -7,7 +7,9 @@ import { transitionSandboxRun } from "@/server/sandbox-runs";
 const SANDBOX_TIMEOUT_MS = 15 * 60 * 1_000;
 const INSTALL_TIMEOUT_MS = 4 * 60 * 1_000;
 const PREVIEW_START_TIMEOUT_MS = SANDBOX_TIMEOUT_MS - 60_000;
+const PREVIEW_HEALTH_CHECK_TIMEOUT_MS = 60_000;
 const MAX_PERSISTED_LOG_LENGTH = 20_000;
+const PREVIEW_LOG_FILE = ".destoc-preview.log";
 
 type SandboxCredentials = {
   token: string;
@@ -46,7 +48,7 @@ async function commandLog(command: { output(stream?: "stdout" | "stderr" | "both
 }
 
 async function waitForPreview(sandbox: Sandbox, ports: readonly number[]): Promise<{ url: string; port: number } | undefined> {
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + PREVIEW_HEALTH_CHECK_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
     for (const port of ports) {
@@ -57,7 +59,12 @@ async function waitForPreview(sandbox: Sandbox, ports: readonly number[]): Promi
           signal: AbortSignal.timeout(2_000),
           redirect: "follow",
         });
-        if (response.ok) return { url, port };
+        // A 4xx/5xx response proves that the proxy is bound. The preview may
+        // legitimately render an application-level error due to a missing
+        // repository environment variable, but the workspace should still be
+        // able to display that error rather than reporting a false startup
+        // failure.
+        if (response.status < 600) return { url, port };
       } catch {
         // The dev server may not have bound the port yet; keep polling.
       }
@@ -74,7 +81,7 @@ async function waitForPreview(sandbox: Sandbox, ports: readonly number[]): Promi
  * need public Sandbox routes. Only the injection proxy is externally exposed.
  */
 async function waitForLocalPreview(sandbox: Sandbox, ports: readonly number[]): Promise<number | undefined> {
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + PREVIEW_HEALTH_CHECK_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
     for (const port of ports) {
@@ -82,7 +89,7 @@ async function waitForLocalPreview(sandbox: Sandbox, ports: readonly number[]): 
         cmd: "node",
         args: [
           "-e",
-          `fetch(\"http://127.0.0.1:${port}\", { redirect: \"follow\", signal: AbortSignal.timeout(2000) }).then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))`,
+          `fetch(\"http://127.0.0.1:${port}\", { redirect: \"follow\", signal: AbortSignal.timeout(2000) }).then(() => process.exit(0)).catch(() => process.exit(1))`,
         ],
         timeoutMs: 3_000,
       });
@@ -93,6 +100,18 @@ async function waitForLocalPreview(sandbox: Sandbox, ports: readonly number[]): 
   }
 
   return undefined;
+}
+
+async function readPreviewLog(sandbox: Sandbox): Promise<string> {
+  try {
+    return truncateLog(await sandbox.fs.readFile(`${sandbox.cwd}/${PREVIEW_LOG_FILE}`, "utf8"));
+  } catch {
+    return "Preview server did not produce a log file.";
+  }
+}
+
+function appendLog(existingLogs: string, nextLog: string): string {
+  return truncateLog(`${existingLogs}\n${nextLog}`);
 }
 
 async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
@@ -167,7 +186,10 @@ export async function executeSandboxRun(
       cmd: "sh",
       args: [
         "-lc",
-        "if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi",
+        // Dependency lifecycle scripts are required by a number of legitimate
+        // web projects. They run only inside the disposable microVM, before
+        // app execution, with no host credentials and tightly scoped egress.
+        "if [ -f package-lock.json ]; then npm ci; else npm install; fi",
       ],
       timeoutMs: INSTALL_TIMEOUT_MS,
     });
@@ -190,29 +212,37 @@ export async function executeSandboxRun(
       cmd: "sh",
       args: [
         "-lc",
-        "npm run dev -- --hostname 0.0.0.0",
+        `exec npm run dev -- --hostname 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`,
       ],
+      cwd: sandbox.cwd,
       detached: true,
       timeoutMs: PREVIEW_START_TIMEOUT_MS,
     });
 
     const upstreamPort = await waitForLocalPreview(sandbox, [3000, 5173]);
     if (!upstreamPort) {
-      throw new AppError("INTERNAL_ERROR", "Sandbox preview did not start on a supported port.", {
-        expose: false,
-      });
+      logs = appendLog(logs, `Preview startup log:\n${await readPreviewLog(sandbox)}`);
+      throw new AppError(
+        "INTERNAL_ERROR",
+        "Preview did not start. Confirm the repository has a runnable npm dev script; its sandbox startup log was saved.",
+        { expose: true },
+      );
     }
 
     const previewUrl = await startPreviewBridge(sandbox, upstreamPort);
 
     return transitionSandboxRun(userId, input.sandboxRunId, "READY", {
       previewUrl,
-      logs: truncateLog(`${logs}\nPreview bridge ready at ${previewUrl} (upstream port ${upstreamPort})`),
+      logs: appendLog(logs, `Preview bridge ready at ${previewUrl} (upstream port ${upstreamPort})`),
     });
   } catch (error) {
     const appError = asAppError(error);
     const errorCode = appError.code === "INTERNAL_ERROR" ? "SANDBOX_EXECUTION_FAILED" : appError.code;
     const errorMessage = appError.expose ? appError.message : "Sandbox execution failed.";
+
+    if (sandbox && !logs.includes("Preview startup log:")) {
+      logs = appendLog(logs, `Preview startup log:\n${await readPreviewLog(sandbox)}`);
+    }
 
     try {
       await transitionSandboxRun(userId, input.sandboxRunId, "FAILED", {
