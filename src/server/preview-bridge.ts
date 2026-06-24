@@ -12,6 +12,7 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   const SELECTION_MESSAGE = "DESTOC_ELEMENT_SELECTED";
   const READY_MESSAGE = "DESTOC_BRIDGE_READY";
   const OVERLAY_ATTRIBUTE = "data-destoc-selection-overlay";
+  const MOTION_FALLBACK_ATTRIBUTE = "data-destoc-motion-fallback";
   const MAX_TEXT_LENGTH = 1_000;
   let enabled = false;
   let highlightedElement = null;
@@ -176,6 +177,36 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
       updateOverlay(null);
     }
   }
+
+  // Some motion libraries leave viewport-triggered content at opacity: 0 in
+  // an isolated preview, even after the page is otherwise idle. Only reveal
+  // sizeable, on-screen, transformed elements after their entry transition
+  // had time to finish; do not touch deliberately hidden or aria-hidden UI.
+  function revealStalledMotion() {
+    const candidates = document.querySelectorAll("[style]");
+    for (const element of candidates) {
+      if (!(element instanceof HTMLElement)) continue;
+      if (element.closest("[aria-hidden=\\\"true\\\"]")) continue;
+      const styles = window.getComputedStyle(element);
+      if (styles.opacity !== "0" || styles.visibility === "hidden") continue;
+      if (styles.transform === "none" && styles.filter === "none") continue;
+
+      const rect = element.getBoundingClientRect();
+      const isVisible = rect.width > 2 && rect.height > 2 && rect.bottom > -80 && rect.top < window.innerHeight + 80;
+      if (!isVisible) continue;
+
+      element.setAttribute(MOTION_FALLBACK_ATTRIBUTE, "true");
+      element.style.setProperty("opacity", "1", "important");
+      element.style.setProperty("transform", "none", "important");
+      element.style.setProperty("filter", "none", "important");
+    }
+  }
+
+  let motionFallbackTimer = window.setTimeout(revealStalledMotion, 2200);
+  window.addEventListener("scroll", () => {
+    window.clearTimeout(motionFallbackTimer);
+    motionFallbackTimer = window.setTimeout(revealStalledMotion, 180);
+  }, { passive: true, capture: true });
 
   window.addEventListener("message", (event) => {
     if (event.source !== window.parent || !event.data || event.data.source !== WORKSPACE_SOURCE) return;

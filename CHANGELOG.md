@@ -22,6 +22,7 @@ All notable project decisions and changes are recorded here.
 - Sandbox preview startup now permits required dependency lifecycle scripts inside the disposable VM, waits up to one minute for the server, and persists detached-server logs on failure.
 - Repository import now accepts the seeded demo workspace ID; ownership enforcement remains the authorization boundary.
 - Workspace status now distinguishes a stopped preview from a live one.
+- Preview sessions now remain available for the maximum Hobby-safe runtime, recover stalled viewport motion in isolated previews, and provide working iframe reload and fullscreen controls.
 
 ### Deferred
 

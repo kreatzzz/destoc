@@ -4,7 +4,9 @@ import { requireProjectOwnership } from "@/server/authorization";
 import { createPreviewBridgeProxyScript } from "@/server/preview-bridge";
 import { transitionSandboxRun } from "@/server/sandbox-runs";
 
-const SANDBOX_TIMEOUT_MS = 15 * 60 * 1_000;
+// A preview is interactive product work, not a short command. Keep it alive
+// for the maximum Hobby-safe window so a reviewer is not interrupted mid-audit.
+const SANDBOX_TIMEOUT_MS = 45 * 60 * 1_000;
 const INSTALL_TIMEOUT_MS = 4 * 60 * 1_000;
 const PREVIEW_START_TIMEOUT_MS = SANDBOX_TIMEOUT_MS - 60_000;
 const PREVIEW_HEALTH_CHECK_TIMEOUT_MS = 60_000;
