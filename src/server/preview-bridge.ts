@@ -10,13 +10,19 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   const WORKSPACE_SOURCE = "destoc-workspace";
   const DESIGN_MODE_MESSAGE = "DESTOC_DESIGN_MODE";
   const SELECTION_MESSAGE = "DESTOC_ELEMENT_SELECTED";
+  const SELECTED_ELEMENTS_MESSAGE = "DESTOC_SELECTED_ELEMENTS";
   const READY_MESSAGE = "DESTOC_BRIDGE_READY";
   const OVERLAY_ATTRIBUTE = "data-destoc-selection-overlay";
+  const LABEL_ATTRIBUTE = "data-destoc-hover-label";
+  const MARKER_LAYER_ATTRIBUTE = "data-destoc-marker-layer";
   const MOTION_FALLBACK_ATTRIBUTE = "data-destoc-motion-fallback";
   const MAX_TEXT_LENGTH = 1_000;
   let enabled = false;
   let highlightedElement = null;
   let overlay = null;
+  let hoverLabel = null;
+  let markerLayer = null;
+  let selectedElements = [];
 
   function post(type, payload) {
     if (window.parent === window) return;
@@ -24,21 +30,68 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   }
 
   function ensureOverlay() {
-    if (overlay || !document.documentElement) return;
-    overlay = document.createElement("div");
-    overlay.setAttribute(OVERLAY_ATTRIBUTE, "true");
-    overlay.setAttribute("aria-hidden", "true");
-    Object.assign(overlay.style, {
-      position: "fixed",
-      pointerEvents: "none",
-      zIndex: "2147483647",
-      border: "2px solid #7c3aed",
-      background: "rgba(124, 58, 237, 0.12)",
-      borderRadius: "3px",
-      boxSizing: "border-box",
-      display: "none",
-    });
-    document.documentElement.appendChild(overlay);
+    if (!document.documentElement) return;
+
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.setAttribute(OVERLAY_ATTRIBUTE, "true");
+      overlay.setAttribute("aria-hidden", "true");
+      Object.assign(overlay.style, {
+        position: "fixed",
+        pointerEvents: "none",
+        zIndex: "2147483645",
+        border: "2px solid #8b5cf6",
+        background: "rgba(124, 58, 237, 0.10)",
+        borderRadius: "4px",
+        boxSizing: "border-box",
+        opacity: "0",
+        left: "0px",
+        top: "0px",
+        width: "0px",
+        height: "0px",
+        transition: "opacity 120ms ease, left 170ms cubic-bezier(0.2, 0, 0, 1), top 170ms cubic-bezier(0.2, 0, 0, 1), width 170ms cubic-bezier(0.2, 0, 0, 1), height 170ms cubic-bezier(0.2, 0, 0, 1)",
+      });
+      document.documentElement.appendChild(overlay);
+    }
+
+    if (!hoverLabel) {
+      hoverLabel = document.createElement("div");
+      hoverLabel.setAttribute(LABEL_ATTRIBUTE, "true");
+      hoverLabel.setAttribute("aria-hidden", "true");
+      Object.assign(hoverLabel.style, {
+        position: "fixed",
+        pointerEvents: "none",
+        zIndex: "2147483647",
+        maxWidth: "260px",
+        padding: "4px 8px",
+        borderRadius: "999px",
+        background: "#1f1235",
+        color: "#f4f0ff",
+        boxShadow: "0 8px 24px rgba(17, 12, 31, 0.22)",
+        font: "500 11px/1.35 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        opacity: "0",
+        transform: "translate3d(0, -6px, 0) scale(0.98)",
+        transition: "opacity 120ms ease, transform 170ms cubic-bezier(0.2, 0, 0, 1), left 170ms cubic-bezier(0.2, 0, 0, 1), top 170ms cubic-bezier(0.2, 0, 0, 1)",
+        willChange: "transform, opacity",
+      });
+      document.documentElement.appendChild(hoverLabel);
+    }
+
+    if (!markerLayer) {
+      markerLayer = document.createElement("div");
+      markerLayer.setAttribute(MARKER_LAYER_ATTRIBUTE, "true");
+      markerLayer.setAttribute("aria-hidden", "true");
+      Object.assign(markerLayer.style, {
+        position: "fixed",
+        inset: "0",
+        pointerEvents: "none",
+        zIndex: "2147483646",
+      });
+      document.documentElement.appendChild(markerLayer);
+    }
   }
 
   function isBridgeElement(element) {
@@ -50,28 +103,110 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
     return target;
   }
 
+  function elementName(element) {
+    const role = inferredRole(element);
+    const text = selectedText(element).slice(0, 52);
+    if (role && text) return role + " · " + text;
+    if (text) return text;
+    if (role) return role;
+    return segment(element).replace(/:nth-of-type\(\d+\)/g, "");
+  }
+
+  function selectedElementBySelector(selector) {
+    try {
+      const element = document.querySelector(selector);
+      return element instanceof Element ? element : null;
+    } catch {
+      return null;
+    }
+  }
+
   function updateOverlay(element) {
     ensureOverlay();
     if (!overlay) return;
 
     if (!enabled || !element || !element.isConnected) {
-      overlay.style.display = "none";
+      overlay.style.opacity = "0";
+      if (hoverLabel) hoverLabel.style.opacity = "0";
       return;
     }
 
     const rect = element.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) {
-      overlay.style.display = "none";
+      overlay.style.opacity = "0";
+      if (hoverLabel) hoverLabel.style.opacity = "0";
       return;
     }
 
     Object.assign(overlay.style, {
-      display: "block",
+      opacity: "1",
       left: Math.round(rect.left) + "px",
       top: Math.round(rect.top) + "px",
       width: Math.round(rect.width) + "px",
       height: Math.round(rect.height) + "px",
     });
+
+    if (hoverLabel) {
+      hoverLabel.textContent = elementName(element);
+      const labelLeft = Math.max(8, Math.min(window.innerWidth - 24, Math.round(rect.left)));
+      const labelTop = Math.max(8, Math.round(rect.top - 10));
+      Object.assign(hoverLabel.style, {
+        opacity: "1",
+        left: labelLeft + "px",
+        top: labelTop + "px",
+        transform: "translate3d(0, -100%, 0) scale(1)",
+      });
+    }
+  }
+
+  function markerText(selection, index) {
+    const value = Number.isInteger(selection.index) ? selection.index + 1 : index + 1;
+    return String(value);
+  }
+
+  function renderMarkers() {
+    ensureOverlay();
+    if (!markerLayer) return;
+    markerLayer.replaceChildren();
+    if (!enabled) return;
+
+    selectedElements.forEach((selection, index) => {
+      if (!selection || typeof selection.selector !== "string") return;
+      const element = selectedElementBySelector(selection.selector);
+      if (!element || !element.isConnected) return;
+      const rect = element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0 || rect.bottom < 0 || rect.top > window.innerHeight) return;
+
+      const marker = document.createElement("div");
+      marker.textContent = markerText(selection, index);
+      Object.assign(marker.style, {
+        position: "fixed",
+        left: Math.round(rect.left + Math.min(rect.width, 28) / 2) + "px",
+        top: Math.round(rect.top - 8) + "px",
+        display: "grid",
+        placeItems: "center",
+        width: "20px",
+        height: "20px",
+        borderRadius: "999px",
+        background: "#7c3aed",
+        color: "#ffffff",
+        boxShadow: "0 8px 20px rgba(76, 29, 149, 0.32)",
+        border: "1px solid rgba(255, 255, 255, 0.72)",
+        font: "700 11px/1 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        fontVariantNumeric: "tabular-nums",
+        transform: "translate3d(-50%, -100%, 0)",
+      });
+      markerLayer.appendChild(marker);
+    });
+  }
+
+  function syncSelectedElements(nextSelectedElements) {
+    selectedElements = Array.isArray(nextSelectedElements)
+      ? nextSelectedElements
+        .filter((selection) => selection && typeof selection.selector === "string")
+        .slice(0, 40)
+      : [];
+    renderMarkers();
   }
 
   function escapeSelector(value) {
@@ -176,6 +311,7 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
       highlightedElement = null;
       updateOverlay(null);
     }
+    renderMarkers();
   }
 
   // Some motion libraries leave viewport-triggered *blurred entrance* content
@@ -212,6 +348,7 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   window.addEventListener("message", (event) => {
     if (event.source !== window.parent || !event.data || event.data.source !== WORKSPACE_SOURCE) return;
     if (event.data.type === DESIGN_MODE_MESSAGE) setEnabled(event.data.enabled);
+    if (event.data.type === SELECTED_ELEMENTS_MESSAGE) syncSelectedElements(event.data.payload);
   });
 
   document.addEventListener("mousemove", (event) => {
@@ -235,7 +372,11 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   }, true);
 
   window.addEventListener("scroll", () => updateOverlay(highlightedElement), true);
-  window.addEventListener("resize", () => updateOverlay(highlightedElement));
+  window.addEventListener("scroll", renderMarkers, true);
+  window.addEventListener("resize", () => {
+    updateOverlay(highlightedElement);
+    renderMarkers();
+  });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ensureOverlay, { once: true });
   else ensureOverlay();
   post(READY_MESSAGE, { pageUrl: window.location.href });
@@ -266,6 +407,7 @@ export const PREVIEW_BRIDGE_PROTOCOL = {
   workspaceSource: "destoc-workspace",
   designMode: "DESTOC_DESIGN_MODE",
   elementSelected: "DESTOC_ELEMENT_SELECTED",
+  selectedElements: "DESTOC_SELECTED_ELEMENTS",
   ready: "DESTOC_BRIDGE_READY",
 } as const;
 

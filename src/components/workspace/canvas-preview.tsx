@@ -13,6 +13,7 @@ import type { WorkspaceSelectedElement } from "./types";
 interface CanvasPreviewProps {
   designMode: boolean;
   previewUrl?: string;
+  selectedElements: WorkspaceSelectedElement[];
   previewStatusText: string;
   previewError: string | null;
   isPreviewStarting: boolean;
@@ -23,6 +24,7 @@ interface CanvasPreviewProps {
 export function CanvasPreview({
   designMode,
   previewUrl,
+  selectedElements,
   previewStatusText,
   previewError,
   isPreviewStarting,
@@ -63,6 +65,29 @@ export function CanvasPreview({
     );
   }
 
+  function sendSelectedElements() {
+    if (!previewUrl) return;
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        source: "destoc-workspace",
+        type: "DESTOC_SELECTED_ELEMENTS",
+        payload: selectedElements.map((element, index) => ({
+          selector: element.selector,
+          index,
+          label: element.role ?? element.text?.slice(0, 48) ?? element.selector,
+          note: element.note,
+        })),
+      },
+      new URL(previewUrl).origin,
+    );
+  }
+
+  useEffect(() => {
+    sendSelectedElements();
+    // This intentionally mirrors the workspace selection list into the iframe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewUrl, selectedElements]);
+
   function setToolMode(mode: "select" | "inspect") {
     const enabled = mode === "select";
     onDesignModeChange(enabled);
@@ -77,7 +102,10 @@ export function CanvasPreview({
           ref={iframeRef}
           title="Repository preview"
           src={previewSource}
-          onLoad={() => sendDesignMode(designMode)}
+          onLoad={() => {
+            sendDesignMode(designMode);
+            sendSelectedElements();
+          }}
           className="h-full w-full border-0 bg-white"
         />
       ) : (

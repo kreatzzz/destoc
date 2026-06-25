@@ -76,6 +76,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const [previewError, setPreviewError] = useState<string | null>(data.preview?.errorMessage ?? null);
   const [isPreviewStarting, setIsPreviewStarting] = useState(activeSandboxStatuses.has(data.preview?.status));
   const [selectedElements, setSelectedElements] = useState<WorkspaceSelectedElement[]>([]);
+  const [activeSelectionSelector, setActiveSelectionSelector] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<WorkspaceChatMessage[]>([
     {
@@ -218,10 +219,23 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       if (current.some((element) => element.selector === selection.selector)) return current;
       return [...current, selection];
     });
+    setActiveSelectionSelector(selection.selector);
   }
 
   function removeSelectedElement(selector: string) {
-    setSelectedElements((current) => current.filter((element) => element.selector !== selector));
+    setSelectedElements((current) => {
+      const nextElements = current.filter((element) => element.selector !== selector);
+      if (activeSelectionSelector === selector) {
+        setActiveSelectionSelector(nextElements.at(-1)?.selector ?? null);
+      }
+      return nextElements;
+    });
+  }
+
+  function updateSelectedElementNote(selector: string, note: string) {
+    setSelectedElements((current) => current.map((element) => (
+      element.selector === selector ? { ...element, note } : element
+    )));
   }
 
   async function sendPrompt() {
@@ -236,7 +250,9 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
     try {
       if (!previewUrl) throw new Error("Preview is still starting. Try again when it is live.");
-      const focusedElement = selectedElements.at(-1) ?? null;
+      const focusedElement = selectedElements.find((element) => element.selector === activeSelectionSelector)
+        ?? selectedElements.at(-1)
+        ?? null;
       const targetResponse = await fetch("/api/reviews/targets", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -251,6 +267,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
               role: element.role,
               text: element.text,
               classes: element.classes,
+              note: element.note,
             })),
           },
           element: mapSelectedElementForApi(focusedElement),
@@ -314,6 +331,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       <div className="flex min-h-0 flex-1">
         <WorkspaceChat
           selectedElements={selectedElements}
+          activeSelectionSelector={activeSelectionSelector}
           messages={messages}
           prompt={prompt}
           isAuditPending={isAuditPending}
@@ -321,10 +339,13 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           onPromptChange={setPrompt}
           onSendPrompt={() => void sendPrompt()}
           onRemoveSelection={removeSelectedElement}
+          onActiveSelectionChange={setActiveSelectionSelector}
+          onSelectionNoteChange={updateSelectedElementNote}
         />
         <CanvasPreview
           designMode={designMode}
           previewUrl={previewUrl}
+          selectedElements={selectedElements}
           previewStatusText={previewStatusText}
           previewError={previewError}
           isPreviewStarting={isPreviewStarting}

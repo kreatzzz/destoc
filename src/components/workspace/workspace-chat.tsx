@@ -11,6 +11,7 @@ import type { WorkspaceChatMessage, WorkspaceSelectedElement } from "./types";
 
 interface WorkspaceChatProps {
   selectedElements: WorkspaceSelectedElement[];
+  activeSelectionSelector: string | null;
   messages: WorkspaceChatMessage[];
   prompt: string;
   isAuditPending: boolean;
@@ -18,6 +19,8 @@ interface WorkspaceChatProps {
   onPromptChange: (value: string) => void;
   onSendPrompt: () => void;
   onRemoveSelection: (selector: string) => void;
+  onActiveSelectionChange: (selector: string) => void;
+  onSelectionNoteChange: (selector: string, note: string) => void;
 }
 
 function elementLabel(element: WorkspaceSelectedElement) {
@@ -31,6 +34,7 @@ const visibleSelectionLimit = 3;
 
 export function WorkspaceChat({
   selectedElements,
+  activeSelectionSelector,
   messages,
   prompt,
   isAuditPending,
@@ -38,10 +42,18 @@ export function WorkspaceChat({
   onPromptChange,
   onSendPrompt,
   onRemoveSelection,
+  onActiveSelectionChange,
+  onSelectionNoteChange,
 }: WorkspaceChatProps) {
   const canSend = prompt.trim().length > 0 && !isAuditPending;
-  const visibleSelections = selectedElements.slice(0, visibleSelectionLimit);
+  const visibleSelections = selectedElements.slice(-visibleSelectionLimit);
   const hiddenSelectionCount = Math.max(0, selectedElements.length - visibleSelections.length);
+  const activeSelection = selectedElements.find((element) => element.selector === activeSelectionSelector)
+    ?? selectedElements.at(-1)
+    ?? null;
+  const activeSelectionNumber = activeSelection
+    ? selectedElements.findIndex((element) => element.selector === activeSelection.selector) + 1
+    : 0;
 
   return (
     <aside className="flex h-full w-[360px] shrink-0 flex-col border-r border-white/[0.07] bg-[#111110] text-zinc-200">
@@ -59,9 +71,33 @@ export function WorkspaceChat({
           {selectedElements.length ? (
             <div className="flex max-w-full items-center gap-1.5 overflow-hidden">
               {visibleSelections.map((element) => (
-                <span key={element.selector} className="group inline-flex min-w-0 max-w-[92px] items-center justify-center gap-1.5 rounded-full bg-[#d7ff64]/10 px-2.5 py-1 text-center text-[11px] text-[#e4ff9d]">
-                  <span className="min-w-0 truncate">{elementLabel(element)}</span>
-                  <button type="button" aria-label={`Remove ${elementLabel(element)}`} onClick={() => onRemoveSelection(element.selector)} className="-mr-0.5 inline-flex size-3.5 shrink-0 items-center justify-center text-[#e4ff9d]/60 transition-colors hover:text-[#e4ff9d]">
+                <span
+                  key={element.selector}
+                  className={cn(
+                    "group inline-flex min-w-0 max-w-[112px] items-center justify-center gap-1.5 rounded-full px-1 py-1 text-center text-[11px] transition-[background-color,color,box-shadow] duration-150",
+                    activeSelection?.selector === element.selector
+                      ? "bg-[#d7ff64] text-[#171916] shadow-[0_0_18px_rgba(215,255,100,0.12)]"
+                      : "bg-[#d7ff64]/10 text-[#e4ff9d] hover:bg-[#d7ff64]/15",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onActiveSelectionChange(element.selector)}
+                    className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 px-1.5 text-current"
+                  >
+                    <span className="shrink-0 font-mono font-semibold tabular-nums">{selectedElements.findIndex((candidate) => candidate.selector === element.selector) + 1}</span>
+                    <span className="min-w-0 truncate">{elementLabel(element)}</span>
+                  </button>
+                  {element.note?.trim() ? <span className="size-1 shrink-0 rounded-full bg-current opacity-70" /> : null}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${elementLabel(element)}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRemoveSelection(element.selector);
+                    }}
+                    className="inline-flex size-3.5 shrink-0 items-center justify-center text-current/60 transition-colors hover:text-current"
+                  >
                     <AnimatedXIcon size={12} />
                   </button>
                 </span>
@@ -76,6 +112,22 @@ export function WorkspaceChat({
             <p className="px-1 text-xs leading-7 text-zinc-600">Select components to attach context.</p>
           )}
         </div>
+        {activeSelection ? (
+          <div className="mb-2 bg-white/[0.035] p-2">
+            <div className="mb-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-zinc-500">
+              <span className="truncate">
+                Note for <span className="font-mono tabular-nums text-[#d7ff64]">#{activeSelectionNumber}</span> {elementLabel(activeSelection)}
+              </span>
+              <span className="shrink-0 text-zinc-600">saved</span>
+            </div>
+            <Textarea
+              value={activeSelection.note ?? ""}
+              onChange={(event) => onSelectionNoteChange(activeSelection.selector, event.target.value)}
+              placeholder="Add what should change or what to review here…"
+              className="max-h-24 min-h-16 resize-none border-0 bg-transparent px-2 py-2 text-xs leading-5 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
+            />
+          </div>
+        ) : null}
         <div className="bg-black/20 p-2">
           <Textarea
             value={prompt}

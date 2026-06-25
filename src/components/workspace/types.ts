@@ -37,6 +37,7 @@ export interface WorkspaceSelectedElement {
   selector: string;
   role: string | null;
   text: string;
+  note?: string;
   domPath: string[];
   classes: string[];
   computedStyles: Record<string, string>;
