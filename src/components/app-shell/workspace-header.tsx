@@ -39,7 +39,7 @@ export function WorkspaceHeader({
   return (
     <header className="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-white/[0.07] bg-[#111110] px-3 text-zinc-300">
       <div className="flex min-w-0 items-center gap-2">
-        <DestocLogo className="h-7 min-w-7 rounded-[0.55rem]" markClassName="text-[19px]" />
+        <DestocLogo className="h-7 min-w-7" markClassName="text-[19px]" />
         <div className="hidden min-w-0 items-center gap-2 sm:flex">
           <span className="text-sm font-semibold tracking-[-0.03em] text-zinc-100">Destoc</span>
           <span className="text-zinc-700">/</span>

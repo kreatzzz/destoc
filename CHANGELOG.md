@@ -34,6 +34,7 @@ All notable project decisions and changes are recorded here.
 - The workspace has been simplified to a left chat/context rail and a full-space preview, removing the old project navigation, right inspector, top Design Mode toggle, preview card chrome, and suggestions badge.
 - Component selections now accumulate as pills above the chat box and are sent as context with chat-driven review prompts.
 - Workspace branding now uses a compact `D.` wordmark and a warmer golden accent palette instead of the previous acid green.
+- The workspace logo now renders as a minimal yellow wordmark without a containing badge.
 
 ### Deferred
 
