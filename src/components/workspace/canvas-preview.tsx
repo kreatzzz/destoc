@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { Eye, Loader2, MousePointer2 } from "lucide-react";
+import { Loader2, MousePointer2 } from "lucide-react";
 
+import { AnimatedCursorClickIcon, AnimatedEyeIcon } from "@/components/ui/animated-icons";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -103,7 +104,7 @@ export function CanvasPreview({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button size="sm" variant="ghost" aria-pressed={designMode} onClick={() => setToolMode("select")} disabled={!previewUrl} className={cn("text-zinc-300 hover:bg-white/[0.08] hover:text-white", designMode && "bg-white/[0.08] text-white")}>
-                <MousePointer2 /> Select
+                <AnimatedCursorClickIcon size={14} /> Select
               </Button>
             </TooltipTrigger>
             <TooltipContent>Select components in the preview</TooltipContent>
@@ -111,7 +112,7 @@ export function CanvasPreview({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button size="sm" variant="ghost" aria-pressed={!designMode} onClick={() => setToolMode("inspect")} disabled={!previewUrl} className={cn("text-zinc-500 hover:bg-white/[0.08] hover:text-white", !designMode && "bg-white/[0.08] text-white")}>
-                <Eye /> Inspect
+                <AnimatedEyeIcon size={14} /> Inspect
               </Button>
             </TooltipTrigger>
             <TooltipContent>Interact with the preview normally</TooltipContent>

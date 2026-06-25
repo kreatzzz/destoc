@@ -1,5 +1,6 @@
-import { Sparkles, Trash2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
+import { AnimatedDeleteIcon } from "@/components/ui/animated-icons";
 import { Button } from "@/components/ui/button";
 import type { WorkspaceProject } from "@/components/workspace/types";
 
@@ -31,7 +32,7 @@ export function WorkspaceHeader({ project, onDisconnect, isDisconnecting }: Work
           onClick={onDisconnect}
           className="gap-1.5 text-zinc-400 hover:bg-rose-500/10 hover:text-rose-200"
         >
-          <Trash2 className="size-3.5" />
+          <AnimatedDeleteIcon size={14} />
           {isDisconnecting ? "Deleting…" : "Delete project"}
         </Button>
       </div>

@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowUp, Loader2, Sparkles, X } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
+import { AnimatedArrowUpIcon, AnimatedXIcon } from "@/components/ui/animated-icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -74,7 +75,7 @@ export function WorkspaceChat({
               <span key={element.selector} className="group inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#d7ff64]/20 bg-[#d7ff64]/10 px-2.5 py-1 text-[11px] text-[#e4ff9d]">
                 <span className="truncate">{elementLabel(element)}</span>
                 <button type="button" aria-label={`Remove ${elementLabel(element)}`} onClick={() => onRemoveSelection(element.selector)} className="text-[#e4ff9d]/60 transition-colors hover:text-[#e4ff9d]">
-                  <X className="size-3" />
+                  <AnimatedXIcon size={12} />
                 </button>
               </span>
             ))}
@@ -112,7 +113,7 @@ export function WorkspaceChat({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button size="icon-sm" aria-label="Send prompt" disabled={!canSend} onClick={onSendPrompt} className="bg-[#d7ff64] text-[#171916] hover:bg-[#e3ff94]">
-                  {isAuditPending ? <Loader2 className="animate-spin" /> : <ArrowUp />}
+                  {isAuditPending ? <Loader2 className="animate-spin" /> : <AnimatedArrowUpIcon />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Send prompt</TooltipContent>

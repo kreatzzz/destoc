@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ArrowUpRight, FolderOpen, Plus } from "lucide-react";
 
+import { AnimatedArrowUpRightIcon, AnimatedFolderOpenIcon, AnimatedPlusIcon } from "@/components/ui/animated-icons";
 import { ProjectImportForm } from "@/components/workspace/project-import-form";
 import { WorkspaceOnboarding } from "@/components/workspace/workspace-onboarding";
 import { Badge } from "@/components/ui/badge";
@@ -33,13 +33,13 @@ export default async function WorkspacePage() {
               {projects.length ? projects.map((project) => (
                 <Link key={project.id} href={`/workspace/${project.id}`} className="group flex items-center justify-between rounded-xl border bg-card p-5 transition-colors hover:bg-accent">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="grid size-9 place-items-center rounded-lg bg-muted"><FolderOpen className="size-4" /></span>
+                    <span className="grid size-9 place-items-center rounded-lg bg-muted"><AnimatedFolderOpenIcon size={16} /></span>
                     <span className="min-w-0"><span className="block truncate font-medium">{project.name}</span><span className="mt-1 block truncate text-sm text-muted-foreground">{project.githubUrl}</span></span>
                   </div>
-                  <ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  <AnimatedArrowUpRightIcon size={16} className="text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </Link>
               )) : (
-                <div className="rounded-xl border border-dashed p-10 text-center"><Plus className="mx-auto size-5 text-muted-foreground" /><p className="mt-3 text-sm font-medium">No connected projects</p><p className="mt-1 text-sm text-muted-foreground">Import a public GitHub repository to begin a focused review.</p></div>
+                <div className="rounded-xl border border-dashed p-10 text-center"><AnimatedPlusIcon size={20} className="mx-auto text-muted-foreground" /><p className="mt-3 text-sm font-medium">No connected projects</p><p className="mt-1 text-sm text-muted-foreground">Import a public GitHub repository to begin a focused review.</p></div>
               )}
             </section>
             <ProjectImportForm workspaceId={activeWorkspace.id} />
