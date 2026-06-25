@@ -22,6 +22,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
     throw error;
   });
   const latestReview = project.reviews[0];
+  const latestSandboxRun = project.sandboxRuns[0];
   const data: WorkspaceData = {
     project: {
       id: project.id,
@@ -46,7 +47,14 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
       impact: suggestion.severity === "high" ? "High impact" : suggestion.severity === "medium" ? "Medium impact" : "Low impact",
       status: toSuggestionStatus(suggestion.status),
     })),
-    previewUrl: project.sandboxRuns[0]?.previewUrl ?? undefined,
+    preview: latestSandboxRun
+      ? {
+          runId: latestSandboxRun.id,
+          status: latestSandboxRun.status,
+          url: latestSandboxRun.status === "READY" ? latestSandboxRun.previewUrl ?? undefined : undefined,
+          errorMessage: latestSandboxRun.errorMessage,
+        }
+      : undefined,
   };
 
   return <DesignWorkspace data={data} />;

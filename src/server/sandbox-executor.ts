@@ -8,15 +8,33 @@ import { transitionSandboxRun } from "@/server/sandbox-runs";
 // for the maximum Hobby-safe window so a reviewer is not interrupted mid-audit.
 const SANDBOX_TIMEOUT_MS = 45 * 60 * 1_000;
 const INSTALL_TIMEOUT_MS = 4 * 60 * 1_000;
+const BUILD_TIMEOUT_MS = 3 * 60 * 1_000;
 const PREVIEW_START_TIMEOUT_MS = SANDBOX_TIMEOUT_MS - 60_000;
 const PREVIEW_HEALTH_CHECK_TIMEOUT_MS = 60_000;
 const MAX_PERSISTED_LOG_LENGTH = 20_000;
 const PREVIEW_LOG_FILE = ".destoc-preview.log";
+const PREVIEW_RUNTIME_HOSTS = [
+  "fonts.googleapis.com",
+  "fonts.gstatic.com",
+  "use.typekit.net",
+  "*.typekit.net",
+  "cdn.jsdelivr.net",
+  "unpkg.com",
+  "cal.com",
+  "*.cal.com",
+  "umami.cooldash.xyz",
+];
 
 type SandboxCredentials = {
   token: string;
   teamId: string;
   projectId: string;
+};
+
+type PackageScripts = {
+  build?: string;
+  dev?: string;
+  start?: string;
 };
 
 /**
@@ -116,6 +134,44 @@ function appendLog(existingLogs: string, nextLog: string): string {
   return truncateLog(`${existingLogs}\n${nextLog}`);
 }
 
+async function isNextProject(sandbox: Sandbox): Promise<boolean> {
+  const check = await sandbox.runCommand({
+    cmd: "node",
+    args: [
+      "-e",
+      "const manifest = require('./package.json'); process.exit(manifest.dependencies?.next || manifest.devDependencies?.next ? 0 : 1)",
+    ],
+    cwd: sandbox.cwd,
+    timeoutMs: 5_000,
+  });
+  return check.exitCode === 0;
+}
+
+async function packageScripts(sandbox: Sandbox): Promise<PackageScripts> {
+  const check = await sandbox.runCommand({
+    cmd: "node",
+    args: [
+      "-e",
+      "const manifest = require('./package.json'); process.stdout.write(JSON.stringify(manifest.scripts || {}));",
+    ],
+    cwd: sandbox.cwd,
+    timeoutMs: 5_000,
+  });
+
+  if (check.exitCode !== 0) return {};
+
+  try {
+    const scripts = JSON.parse(await check.output("stdout")) as Record<string, unknown>;
+    return {
+      build: typeof scripts.build === "string" ? scripts.build : undefined,
+      dev: typeof scripts.dev === "string" ? scripts.dev : undefined,
+      start: typeof scripts.start === "string" ? scripts.start : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
   const bridgePath = `${sandbox.cwd}/.destoc-preview-bridge.cjs`;
   await sandbox.fs.writeFile(bridgePath, createPreviewBridgeProxyScript(upstreamPort), "utf8");
@@ -171,19 +227,36 @@ export async function executeSandboxRun(
       // remains reachable solely over localhost inside the VM.
       ports: [3001],
       runtime: "node24",
-      env: { NODE_ENV: "development" },
+      env: { NODE_ENV: "production" },
       resources: { vcpus: 1 },
       timeout: SANDBOX_TIMEOUT_MS,
       persistent: false,
       networkPolicy: {
-        allow: ["github.com", "*.github.com", "registry.npmjs.org", "*.npmjs.org"],
+        allow: ["github.com", "*.github.com", "registry.npmjs.org", "*.npmjs.org", ...PREVIEW_RUNTIME_HOSTS],
       },
     });
 
     await transitionSandboxRun(userId, input.sandboxRunId, "BUILDING", {
-      logs: `Provisioned sandbox ${sandbox.name}. Installing project dependencies.`,
+      logs: `Provisioned sandbox ${sandbox.name}. Inspecting project manifest.`,
     });
 
+    const scripts = await packageScripts(sandbox);
+    const nextProject = await isNextProject(sandbox);
+    if (!nextProject && !scripts.dev && !scripts.start) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "This repository does not define a runnable web preview script. Destoc currently expects an npm dev or start script.",
+      );
+    }
+
+    if (nextProject && (!scripts.build || !scripts.start)) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "This Next.js repository needs both npm run build and npm run start scripts for a production sandbox preview.",
+      );
+    }
+
+    logs = `Provisioned sandbox ${sandbox.name}. Installing project dependencies.`;
     const install = await sandbox.runCommand({
       cmd: "sh",
       args: [
@@ -193,6 +266,10 @@ export async function executeSandboxRun(
         // app execution, with no host credentials and tightly scoped egress.
         "if [ -f package-lock.json ]; then npm ci; else npm install; fi",
       ],
+      // Production previews still need devDependencies to build source apps
+      // (PostCSS, TypeScript, bundler plugins, etc.). The serving process is
+      // switched to NODE_ENV=production after this setup step.
+      env: { NODE_ENV: "development" },
       timeoutMs: INSTALL_TIMEOUT_MS,
     });
     const installLog = await commandLog(install);
@@ -205,16 +282,38 @@ export async function executeSandboxRun(
       });
     }
 
-    // The application must not have network egress after installation. It has
-    // no app credentials in its environment either, so source code cannot read
-    // the host application's secrets.
-    await sandbox.updateNetworkPolicy("deny-all");
+    if (nextProject) {
+      logs = appendLog(logs, "Building production preview.");
+      const build = await sandbox.runCommand({
+        cmd: "npm",
+        args: ["run", "build"],
+        cwd: sandbox.cwd,
+        timeoutMs: BUILD_TIMEOUT_MS,
+      });
+      const buildLog = await commandLog(build);
+      logs = appendLog(logs, `Production build:\n${buildLog}`);
+      if (build.exitCode !== 0) {
+        throw new AppError("INTERNAL_ERROR", "Sandbox production build failed.", {
+          expose: false,
+          cause: buildLog,
+        });
+      }
+    }
+
+    // The untrusted application never receives application credentials. Keep
+    // the public rendering hosts needed by a typical web UI (fonts and embeds)
+    // while denying arbitrary outbound connections from the preview runtime.
+    await sandbox.updateNetworkPolicy({ allow: PREVIEW_RUNTIME_HOSTS });
 
     await sandbox.runCommand({
       cmd: "sh",
       args: [
         "-lc",
-        `exec npm run dev -- --hostname 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`,
+        nextProject
+          ? `exec npm run start -- -H 0.0.0.0 -p 3000 > ${PREVIEW_LOG_FILE} 2>&1`
+          : scripts.dev
+            ? `exec npm run dev -- --hostname 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`
+            : `exec npm run start -- --hostname 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`,
       ],
       cwd: sandbox.cwd,
       detached: true,

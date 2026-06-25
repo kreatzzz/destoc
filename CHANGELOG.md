@@ -24,6 +24,11 @@ All notable project decisions and changes are recorded here.
 - Workspace status now distinguishes a stopped preview from a live one.
 - Preview sessions now remain available for the maximum Hobby-safe runtime, recover stalled viewport motion in isolated previews, and provide working iframe reload and fullscreen controls.
 - A stale or expired preview can now be restarted directly from the preview toolbar.
+- Next.js repositories now use a built production preview, with a constrained public-host allowlist for fonts and common embeds; motion fallbacks no longer override continuous transforms such as marquees.
+- Preview refresh now probes sandbox liveness server-side, marks expired 410/404 previews as stopped, and avoids reloading dead iframe URLs.
+- The workspace now defaults to Inspect mode so source-site animations run naturally until Design Mode is explicitly enabled.
+- Sandbox startup now rejects non-web repositories without `npm run dev` or `npm run start` before dependency installation.
+- Workspace toolbar, rail, and inspector buttons now use shadcn tooltips; Select/Inspect, Page Audit, Settings, Activity, Reload, Restart, and Fullscreen controls have real behavior.
 
 ### Deferred
 

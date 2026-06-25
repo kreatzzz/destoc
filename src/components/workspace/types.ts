@@ -26,9 +26,32 @@ export interface WorkspaceSuggestion {
   status: ReviewStatus;
 }
 
+export interface WorkspacePreview {
+  runId?: string;
+  status?: "QUEUED" | "PROVISIONING" | "BUILDING" | "READY" | "FAILED" | "STOPPED";
+  url?: string;
+  errorMessage?: string | null;
+}
+
+export interface WorkspaceSelectedElement {
+  selector: string;
+  role: string | null;
+  text: string;
+  domPath: string[];
+  classes: string[];
+  computedStyles: Record<string, string>;
+  boundingBox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  pageUrl: string;
+}
+
 export interface WorkspaceData {
   project: WorkspaceProject;
   revisions: WorkspaceRevision[];
   suggestions: WorkspaceSuggestion[];
-  previewUrl?: string;
+  preview?: WorkspacePreview;
 }

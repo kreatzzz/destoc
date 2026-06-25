@@ -4,6 +4,8 @@
 
 - [ ] Configure a live DeepSeek provider and validate structured reviews against real component evidence.
 - [ ] Validate preview startup across framework/package-manager variants and add persisted screenshot capture.
+- [ ] Add a repository capability scanner so non-web imports are flagged before users start a sandbox.
+- [ ] Add per-project runtime host/env allowlists for previews that legitimately depend on third-party services.
 
 ## Deliberately deferred
 
@@ -20,3 +22,4 @@
 - [x] Implement public repository validation, sandbox lifecycle APIs, mock reviews, patch restrictions, and persisted decisions.
 - [x] Build the desktop three-pane workspace, lightweight auth entry flow, loading/empty/error states, rate limits, tests, and environment documentation.
 - [x] Provide a local Docker PostgreSQL service, committed initial migration, and seedable demo account.
+- [x] Add liveness-aware sandbox reload/restart behavior, production Next.js previews, tooltips, and functional workspace controls.

@@ -54,3 +54,41 @@ export async function transitionSandboxRun(
     },
   });
 }
+
+export async function probeSandboxRunHealth(userId: string, projectId: string, sandboxRunId: string) {
+  await requireProjectOwnership(projectId, userId);
+
+  const run = await getPrisma().sandboxRun.findFirst({
+    where: { id: sandboxRunId, projectId },
+  });
+  if (!run) throw new AppError("NOT_FOUND", "Sandbox run not found.");
+
+  if (run.status !== "READY" || !run.previewUrl) {
+    return { sandboxRun: run, reachable: false, stopped: run.status === "STOPPED" };
+  }
+
+  try {
+    const response = await fetch(run.previewUrl, {
+      method: "HEAD",
+      redirect: "manual",
+      signal: AbortSignal.timeout(4_000),
+    });
+
+    if (response.status === 410 || response.status === 404) {
+      const stoppedRun = await transitionSandboxRun(userId, run.id, "STOPPED", {
+        errorCode: "SANDBOX_STOPPED",
+        errorMessage: "The sandbox preview has expired. Start a new preview to continue.",
+      });
+      return { sandboxRun: stoppedRun, reachable: false, stopped: true, httpStatus: response.status };
+    }
+
+    return {
+      sandboxRun: run,
+      reachable: response.status < 600,
+      stopped: false,
+      httpStatus: response.status,
+    };
+  } catch {
+    return { sandboxRun: run, reachable: false, stopped: false };
+  }
+}
