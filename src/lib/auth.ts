@@ -14,6 +14,10 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     maxPasswordLength: 128,
   },
+  session: {
+    expiresIn: 60 * 60 * 24 * 30,
+    updateAge: 60 * 60 * 24,
+  },
   secret: getServerEnv().BETTER_AUTH_SECRET,
   baseURL: getServerEnv().BETTER_AUTH_URL,
   advanced: {
