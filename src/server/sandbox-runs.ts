@@ -55,6 +55,26 @@ export async function transitionSandboxRun(
   });
 }
 
+export async function updateSandboxRunProgress(
+  userId: string,
+  sandboxRunId: string,
+  metadata: {
+    logs?: string;
+    errorCode?: string;
+    errorMessage?: string;
+  },
+) {
+  const run = await getPrisma().sandboxRun.findFirst({
+    where: { id: sandboxRunId, project: { workspace: { userId } } },
+  });
+  if (!run) throw new AppError("NOT_FOUND", "Sandbox run not found.");
+
+  return getPrisma().sandboxRun.update({
+    where: { id: run.id },
+    data: metadata,
+  });
+}
+
 export async function probeSandboxRunHealth(userId: string, projectId: string, sandboxRunId: string) {
   await requireProjectOwnership(projectId, userId);
 

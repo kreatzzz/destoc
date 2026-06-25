@@ -1,144 +1,242 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { WorkspaceHeader } from "@/components/app-shell/workspace-header";
 import { CanvasPreview } from "./canvas-preview";
-import { ProjectNavigation } from "./project-navigation";
-import { ReviewInspector } from "./review-inspector";
-import type { ReviewStatus, WorkspaceData, WorkspaceSelectedElement } from "./types";
+import { WorkspaceChat } from "./workspace-chat";
+import type { WorkspaceChatMessage, WorkspaceData, WorkspacePreview, WorkspaceSelectedElement } from "./types";
 
-type WorkspacePanel = "canvas" | "audit" | "settings" | "activity";
+type SandboxRunPayload = {
+  id: string;
+  status: NonNullable<WorkspacePreview["status"]>;
+  previewUrl?: string | null;
+  logs?: string | null;
+  errorMessage?: string | null;
+};
 
 const defaultData: WorkspaceData = {
   project: { id: "objects", name: "Objects collection", repository: "miloh/objects", branch: "main", updatedAt: "Just now", revisionCount: 4 },
-  revisions: [
-    { id: "current", label: "Current canvas", description: "Unpublished changes", createdAt: "Now", isActive: true },
-    { id: "r3", label: "Refine hierarchy", description: "3 suggestions applied", createdAt: "18 min ago" },
-    { id: "r2", label: "First audit", description: "Baseline capture", createdAt: "Today, 10:42" },
-  ],
-  suggestions: [{ id: "heading", title: "Tighten the primary message", summary: "The heading has a strong point of view, but its two-line break creates more friction than emphasis at this width.", rationale: "A more intentional measure will make the opening proposition easier to scan before the visitor reaches the collection.", impact: "High impact", status: "pending" }],
+  revisions: [],
+  suggestions: [],
 };
 
 interface DesignWorkspaceProps {
   data?: WorkspaceData;
 }
 
+const activeSandboxStatuses = new Set<WorkspacePreview["status"]>(["QUEUED", "PROVISIONING", "BUILDING"]);
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function progressText(status: WorkspacePreview["status"] | undefined, logs: string, previewUrl: string | undefined, error: string | null) {
+  if (error) return "Preview needs attention";
+  if (previewUrl && status === "READY") return "Preview live";
+  if (logs.includes("Starting preview bridge")) return "Connecting preview bridge…";
+  if (logs.includes("Starting preview server")) return "Starting preview server…";
+  if (logs.includes("Building production preview")) return "Building production preview…";
+  if (logs.includes("Installing project dependencies")) return "Installing dependencies…";
+  if (logs.includes("Inspecting project manifest")) return "Inspecting repository…";
+  if (status === "QUEUED") return "Queued preview startup…";
+  if (status === "PROVISIONING") return "Provisioning isolated sandbox…";
+  if (status === "BUILDING") return "Preparing repository preview…";
+  if (status === "STOPPED") return "Preview stopped. Restarting…";
+  if (status === "FAILED") return "Preview failed";
+  return "Preparing preview…";
+}
+
+function mapSelectedElementForApi(element: WorkspaceSelectedElement | null) {
+  if (!element) return undefined;
+  return {
+    selector: element.selector,
+    role: element.role ?? undefined,
+    text: element.text || undefined,
+    domPath: element.domPath,
+    computedStyles: element.computedStyles,
+    boundingBox: {
+      x: element.boundingBox.x,
+      y: element.boundingBox.y,
+      width: element.boundingBox.width,
+      height: element.boundingBox.height,
+    },
+    classNames: element.classes,
+  };
+}
+
 export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
-  const [activeRevisionId, setActiveRevisionId] = useState(data.revisions.find((revision) => revision.isActive)?.id ?? data.revisions[0]?.id ?? "");
-  const [activePanel, setActivePanel] = useState<WorkspacePanel>("canvas");
+  const router = useRouter();
   const [designMode, setDesignMode] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(data.preview?.url);
   const [sandboxRunId, setSandboxRunId] = useState(data.preview?.runId);
+  const [previewStatus, setPreviewStatus] = useState<WorkspacePreview["status"]>(data.preview?.status);
+  const [previewLogs, setPreviewLogs] = useState("");
   const [previewError, setPreviewError] = useState<string | null>(data.preview?.errorMessage ?? null);
-  const [selectedElement, setSelectedElement] = useState<WorkspaceSelectedElement | null>(null);
-  const [isStartingPreview, startPreviewTransition] = useTransition();
-  const [isRefreshingPreview, startRefreshTransition] = useTransition();
-  const [isDisconnecting, startDisconnectTransition] = useTransition();
-  const [isAuditPending, startAuditTransition] = useTransition();
-  const initialSuggestion = data.suggestions[0];
-  const [suggestionStatus, setSuggestionStatus] = useState<ReviewStatus>(initialSuggestion?.status ?? "pending");
-  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [isPreviewStarting, setIsPreviewStarting] = useState(activeSandboxStatuses.has(data.preview?.status));
+  const [selectedElements, setSelectedElements] = useState<WorkspaceSelectedElement[]>([]);
+  const [prompt, setPrompt] = useState("");
+  const [messages, setMessages] = useState<WorkspaceChatMessage[]>([
+    {
+      id: "welcome",
+      role: "assistant",
+      content: "Select components in the preview, then ask for a design audit or improvement plan. I’ll keep the selected components as context.",
+    },
+  ]);
+  const [isAuditPending, setIsAuditPending] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
-  const [isDecisionPending, startDecisionTransition] = useTransition();
-  const router = useRouter();
-  const suggestion = initialSuggestion ? { ...initialSuggestion, status: suggestionStatus } : null;
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const activeRunRef = useRef<string | undefined>(data.preview?.runId);
+  const startingRef = useRef(false);
+  const autoStartAttemptedRef = useRef(false);
 
-  const markPreviewStopped = useCallback((message = "The sandbox preview has expired. Start a new preview to continue.") => {
-    setPreviewUrl(undefined);
-    setSandboxRunId(undefined);
-    setPreviewError(message);
+  const previewStatusText = useMemo(
+    () => progressText(previewStatus, previewLogs, previewUrl, previewError),
+    [previewError, previewLogs, previewStatus, previewUrl],
+  );
+
+  const applyRunState = useCallback((run: SandboxRunPayload) => {
+    setSandboxRunId(run.id);
+    setPreviewStatus(run.status);
+    setPreviewLogs(run.logs ?? "");
+    setPreviewError(run.errorMessage ?? null);
+    if (run.previewUrl && run.status === "READY") setPreviewUrl(run.previewUrl);
   }, []);
 
-  useEffect(() => {
-    if (!sandboxRunId || !previewUrl) return;
+  const pollSandboxRun = useCallback(async (runId: string) => {
+    activeRunRef.current = runId;
+    setIsPreviewStarting(true);
 
-    let cancelled = false;
-    async function probeInitialPreview() {
-      const response = await fetch(`/api/projects/${data.project.id}/sandbox-runs/${sandboxRunId}?probe=true`, { cache: "no-store" });
-      const payload = await response.json().catch(() => null) as { stopped?: boolean; sandboxRun?: { errorMessage?: string | null } } | null;
-      if (!cancelled && response.ok && payload?.stopped) {
-        markPreviewStopped(payload.sandboxRun?.errorMessage ?? undefined);
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      if (activeRunRef.current !== runId) return;
+
+      const response = await fetch(`/api/projects/${data.project.id}/sandbox-runs/${runId}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null) as { sandboxRun?: SandboxRunPayload; error?: { message?: string } } | null;
+
+      if (!response.ok || !payload?.sandboxRun) {
+        setPreviewError(payload?.error?.message ?? "Could not read sandbox progress.");
+        setIsPreviewStarting(false);
+        return;
       }
+
+      applyRunState(payload.sandboxRun);
+
+      if (payload.sandboxRun.status === "READY" && payload.sandboxRun.previewUrl) {
+        setPreviewUrl(payload.sandboxRun.previewUrl);
+        setIsPreviewStarting(false);
+        router.refresh();
+        return;
+      }
+
+      if (payload.sandboxRun.status === "FAILED" || payload.sandboxRun.status === "STOPPED") {
+        setPreviewUrl(undefined);
+        setPreviewError(payload.sandboxRun.errorMessage ?? "Sandbox preview could not start.");
+        setIsPreviewStarting(false);
+        router.refresh();
+        return;
+      }
+
+      await wait(1_500);
     }
 
-    void probeInitialPreview();
-    return () => {
-      cancelled = true;
-    };
-  }, [data.project.id, markPreviewStopped, previewUrl, sandboxRunId]);
+    setPreviewError("Sandbox startup is still running. Refresh the project to continue watching progress.");
+    setIsPreviewStarting(false);
+  }, [applyRunState, data.project.id, router]);
 
-  function decideSuggestion(status: "accepted" | "rejected") {
-    if (!suggestion || suggestion.status !== "pending") return;
+  const startPreview = useCallback(async () => {
+    if (startingRef.current) return;
 
-    setDecisionError(null);
-    startDecisionTransition(async () => {
-      const response = await fetch(`/api/suggestions/${suggestion.id}/${status === "accepted" ? "accept" : "reject"}`, {
+    startingRef.current = true;
+    setIsPreviewStarting(true);
+    setPreviewUrl(undefined);
+    setPreviewError(null);
+    setPreviewLogs("");
+    setPreviewStatus("QUEUED");
+
+    try {
+      const response = await fetch(`/api/projects/${data.project.id}/sandbox-runs`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: status === "rejected" ? JSON.stringify({}) : undefined,
+        body: "{}",
       });
-      const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-      if (!response.ok) {
-        setDecisionError(payload?.error?.message ?? "Could not update this suggestion.");
+      const payload = await response.json().catch(() => null) as { sandboxRun?: SandboxRunPayload; error?: { message?: string } } | null;
+
+      if (!response.ok || !payload?.sandboxRun?.id) {
+        setPreviewError(payload?.error?.message ?? "Preview could not be queued.");
+        setIsPreviewStarting(false);
         return;
       }
 
-      setSuggestionStatus(status);
-      router.refresh();
-    });
-  }
+      applyRunState(payload.sandboxRun);
+      await pollSandboxRun(payload.sandboxRun.id);
+    } finally {
+      startingRef.current = false;
+    }
+  }, [applyRunState, data.project.id, pollSandboxRun]);
 
-  function startPreview() {
-    setPreviewError(null);
-    startPreviewTransition(async () => {
-      const response = await fetch(`/api/projects/${data.project.id}/sandbox-runs`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-      const payload = await response.json().catch(() => null) as { sandboxRun?: { id: string; previewUrl?: string; errorMessage?: string | null }; error?: { message?: string } } | null;
-      if (!response.ok || !payload?.sandboxRun?.previewUrl) {
-        setPreviewError(payload?.error?.message ?? payload?.sandboxRun?.errorMessage ?? "Preview could not be started.");
-        return;
-      }
-      setSandboxRunId(payload.sandboxRun.id);
-      setPreviewUrl(payload.sandboxRun.previewUrl);
-      router.refresh();
-    });
-  }
+  useEffect(() => {
+    if (sandboxRunId) activeRunRef.current = sandboxRunId;
+  }, [sandboxRunId]);
 
-  function refreshPreview(): Promise<boolean> {
-    if (!sandboxRunId) return Promise.resolve(true);
+  useEffect(() => {
+    if (autoStartAttemptedRef.current) return;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
-    return new Promise((resolve) => {
-      startRefreshTransition(async () => {
-        const response = await fetch(`/api/projects/${data.project.id}/sandbox-runs/${sandboxRunId}?probe=true`, { cache: "no-store" });
-        const payload = await response.json().catch(() => null) as { stopped?: boolean; sandboxRun?: { errorMessage?: string | null }; error?: { message?: string } } | null;
-        if (!response.ok) {
-          setPreviewError(payload?.error?.message ?? "Could not refresh the preview.");
-          resolve(false);
-          return;
-        }
-        if (payload?.stopped) {
-          markPreviewStopped(payload.sandboxRun?.errorMessage ?? undefined);
-          router.refresh();
-          resolve(false);
-          return;
-        }
-
-        setPreviewError(null);
-        resolve(true);
-      });
-    });
-  }
-
-  function runPageAudit() {
-    if (!previewUrl) {
-      setAuditError("Start a preview before running a page audit.");
-      return;
+    if (sandboxRunId && activeSandboxStatuses.has(previewStatus)) {
+      autoStartAttemptedRef.current = true;
+      timeout = setTimeout(() => void pollSandboxRun(sandboxRunId), 0);
+      return () => {
+        if (timeout) clearTimeout(timeout);
+      };
     }
 
-    setActivePanel("audit");
+    if (!previewUrl && previewStatus !== "FAILED") {
+      autoStartAttemptedRef.current = true;
+      timeout = setTimeout(() => void startPreview(), 0);
+      return () => {
+        if (timeout) clearTimeout(timeout);
+      };
+    }
+
+    if (sandboxRunId && previewUrl && previewStatus === "READY") {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const response = await fetch(`/api/projects/${data.project.id}/sandbox-runs/${sandboxRunId}?probe=true`, { cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { stopped?: boolean; sandboxRun?: SandboxRunPayload } | null;
+        if (response.ok && payload?.stopped) {
+          setPreviewUrl(undefined);
+          applyRunState(payload.sandboxRun!);
+          await startPreview();
+        }
+      })();
+    }
+  }, [applyRunState, data.project.id, pollSandboxRun, previewStatus, previewUrl, sandboxRunId, startPreview]);
+
+  function addSelectedElement(selection: WorkspaceSelectedElement) {
+    setSelectedElements((current) => {
+      if (current.some((element) => element.selector === selection.selector)) return current;
+      return [...current, selection];
+    });
+  }
+
+  function removeSelectedElement(selector: string) {
+    setSelectedElements((current) => current.filter((element) => element.selector !== selector));
+  }
+
+  async function sendPrompt() {
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt || isAuditPending) return;
+
+    setPrompt("");
     setAuditError(null);
-    startAuditTransition(async () => {
+    setIsAuditPending(true);
+    const messageId = crypto.randomUUID();
+    setMessages((current) => [...current, { id: messageId, role: "user", content: trimmedPrompt }]);
+
+    try {
+      if (!previewUrl) throw new Error("Preview is still starting. Try again when it is live.");
+      const focusedElement = selectedElements.at(-1) ?? null;
       const targetResponse = await fetch("/api/reviews/targets", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -146,13 +244,21 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           projectId: data.project.id,
           sandboxRunId,
           pageUrl: previewUrl,
-          domContext: { source: "workspace-page-audit" },
+          domContext: {
+            source: "workspace-chat",
+            selectedElements: selectedElements.map((element) => ({
+              selector: element.selector,
+              role: element.role,
+              text: element.text,
+              classes: element.classes,
+            })),
+          },
+          element: mapSelectedElementForApi(focusedElement),
         }),
       });
       const targetPayload = await targetResponse.json().catch(() => null) as { reviewTarget?: { id: string }; error?: { message?: string } } | null;
       if (!targetResponse.ok || !targetPayload?.reviewTarget?.id) {
-        setAuditError(targetPayload?.error?.message ?? "Could not create a review target.");
-        return;
+        throw new Error(targetPayload?.error?.message ?? "Could not create a review target.");
       }
 
       const reviewResponse = await fetch("/api/reviews", {
@@ -162,71 +268,70 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           projectId: data.project.id,
           reviewTargetId: targetPayload.reviewTarget.id,
           scope: "PAGE",
-          prompt: "Audit this page for hierarchy, motion, spacing, interaction clarity, and implementation-safe improvements.",
+          prompt: trimmedPrompt,
         }),
       });
-      const reviewPayload = await reviewResponse.json().catch(() => null) as { error?: { message?: string } } | null;
-      if (!reviewResponse.ok) {
-        setAuditError(reviewPayload?.error?.message ?? "Could not run the page audit.");
-        return;
-      }
+      const reviewPayload = await reviewResponse.json().catch(() => null) as {
+        review?: { result?: { summary?: string }; suggestions?: Array<{ title?: string }> };
+        error?: { message?: string };
+      } | null;
+      if (!reviewResponse.ok) throw new Error(reviewPayload?.error?.message ?? "Could not run the design review.");
 
+      const summary = reviewPayload?.review?.result?.summary
+        ?? reviewPayload?.review?.suggestions?.[0]?.title
+        ?? "I created a new design review from your selected context.";
+      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: summary }]);
       router.refresh();
-    });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not complete the review.";
+      setAuditError(message);
+      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: message }]);
+    } finally {
+      setIsAuditPending(false);
+    }
   }
 
-  function disconnectProject() {
+  async function disconnectProject() {
     if (!window.confirm(`Delete ${data.project.repository} from Destoc? This permanently deletes its Destoc reviews and revisions, but never the GitHub repository.`)) return;
-    startDisconnectTransition(async () => {
-      const response = await fetch(`/api/projects/${data.project.id}`, { method: "DELETE" });
-      if (response.ok) router.push("/workspace");
-      else setPreviewError("Project could not be deleted.");
-    });
+    setIsDisconnecting(true);
+    const response = await fetch(`/api/projects/${data.project.id}`, { method: "DELETE" });
+    if (response.ok) router.push("/workspace");
+    else {
+      setPreviewError("Project could not be deleted.");
+      setIsDisconnecting(false);
+    }
   }
 
   return (
-    <div className="flex h-dvh min-h-[640px] flex-col overflow-hidden bg-[#131312] font-sans antialiased">
+    <div className="flex h-dvh min-h-[640px] flex-col overflow-hidden bg-[#111110] font-sans antialiased">
       <WorkspaceHeader
         project={data.project}
-        onDisconnect={disconnectProject}
+        onDisconnect={() => void disconnectProject()}
         isDisconnecting={isDisconnecting}
-        hasPreview={Boolean(previewUrl)}
       />
       <div className="flex min-h-0 flex-1">
-        <ProjectNavigation
-          data={data}
-          activeRevisionId={activeRevisionId}
-          activePanel={activePanel}
-          onPanelChange={setActivePanel}
-          onRevisionChange={setActiveRevisionId}
-          onRunPageAudit={runPageAudit}
+        <WorkspaceChat
+          project={data.project}
+          selectedElements={selectedElements}
+          messages={messages}
+          prompt={prompt}
+          previewStatusText={previewStatusText}
+          previewError={previewError}
+          isPreviewStarting={isPreviewStarting}
           isAuditPending={isAuditPending}
+          auditError={auditError}
+          onPromptChange={setPrompt}
+          onSendPrompt={() => void sendPrompt()}
+          onRemoveSelection={removeSelectedElement}
         />
         <CanvasPreview
           designMode={designMode}
           previewUrl={previewUrl}
-          onDesignModeChange={setDesignMode}
-          onSelectionChange={(selection) => {
-            setSelectedElement(selection);
-            setActivePanel("audit");
-          }}
-          onStartPreview={startPreview}
-          onRefreshPreview={refreshPreview}
-          isStartingPreview={isStartingPreview}
-          isRefreshingPreview={isRefreshingPreview}
+          previewStatusText={previewStatusText}
           previewError={previewError}
-          suggestionCount={data.suggestions.length}
-        />
-        <ReviewInspector
-          activePanel={activePanel}
-          selectedElement={selectedElement}
-          suggestion={suggestion}
-          onSuggestionStatusChange={decideSuggestion}
-          onRunPageAudit={runPageAudit}
-          isAuditPending={isAuditPending}
-          auditError={auditError}
-          isDecisionPending={isDecisionPending}
-          decisionError={decisionError}
+          isPreviewStarting={isPreviewStarting}
+          onDesignModeChange={setDesignMode}
+          onSelectionChange={addSelectedElement}
         />
       </div>
     </div>

@@ -2,7 +2,7 @@ import { Sandbox } from "@vercel/sandbox";
 import { AppError, asAppError } from "@/lib/errors";
 import { requireProjectOwnership } from "@/server/authorization";
 import { createPreviewBridgeProxyScript } from "@/server/preview-bridge";
-import { transitionSandboxRun } from "@/server/sandbox-runs";
+import { transitionSandboxRun, updateSandboxRunProgress } from "@/server/sandbox-runs";
 
 // A preview is interactive product work, not a short command. Keep it alive
 // for the maximum Hobby-safe window so a reviewer is not interrupted mid-audit.
@@ -257,6 +257,7 @@ export async function executeSandboxRun(
     }
 
     logs = `Provisioned sandbox ${sandbox.name}. Installing project dependencies.`;
+    await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
     const install = await sandbox.runCommand({
       cmd: "sh",
       args: [
@@ -284,6 +285,7 @@ export async function executeSandboxRun(
 
     if (nextProject) {
       logs = appendLog(logs, "Building production preview.");
+      await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
       const build = await sandbox.runCommand({
         cmd: "npm",
         args: ["run", "build"],
@@ -305,6 +307,8 @@ export async function executeSandboxRun(
     // while denying arbitrary outbound connections from the preview runtime.
     await sandbox.updateNetworkPolicy({ allow: PREVIEW_RUNTIME_HOSTS });
 
+    logs = appendLog(logs, "Starting preview server.");
+    await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
     await sandbox.runCommand({
       cmd: "sh",
       args: [
@@ -330,6 +334,8 @@ export async function executeSandboxRun(
       );
     }
 
+    logs = appendLog(logs, `Starting preview bridge for upstream port ${upstreamPort}.`);
+    await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
     const previewUrl = await startPreviewBridge(sandbox, upstreamPort);
 
     return transitionSandboxRun(userId, input.sandboxRunId, "READY", {

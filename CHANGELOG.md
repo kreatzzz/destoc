@@ -29,6 +29,10 @@ All notable project decisions and changes are recorded here.
 - The workspace now defaults to Inspect mode so source-site animations run naturally until Design Mode is explicitly enabled.
 - Sandbox startup now rejects non-web repositories without `npm run dev` or `npm run start` before dependency installation.
 - Workspace toolbar, rail, and inspector buttons now use shadcn tooltips; Select/Inspect, Page Audit, Settings, Activity, Reload, Restart, and Fullscreen controls have real behavior.
+- Sandbox startup now queues immediately and reports progress through polling instead of blocking the UI while install/build/start runs.
+- Stopped previews now auto-retry when a project opens, while failed non-web repositories remain failed with their actionable error.
+- The workspace has been simplified to a left chat/context rail and a full-space preview, removing the old project navigation, right inspector, top Design Mode toggle, preview card chrome, and suggestions badge.
+- Component selections now accumulate as pills above the chat box and are sent as context with chat-driven review prompts.
 
 ### Deferred
 

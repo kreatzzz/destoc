@@ -21,12 +21,15 @@ export async function POST(request: Request, { params }: RouteContext) {
     const { projectId } = await params;
     const { commitSha } = queueSandboxRunSchema.parse(await readJsonBody(request));
     const sandboxRun = await queueSandboxRun(user.id, projectId, commitSha);
-    const run = await executeSandboxRun(user.id, {
+
+    void executeSandboxRun(user.id, {
       sandboxRunId: sandboxRun.id,
       projectId,
       commitSha,
+    }).catch((error: unknown) => {
+      console.error("Sandbox execution failed after queueing", error);
     });
 
-    return NextResponse.json({ sandboxRun: run }, { status: 201 });
+    return NextResponse.json({ sandboxRun }, { status: 202 });
   });
 }

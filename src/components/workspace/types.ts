@@ -49,6 +49,12 @@ export interface WorkspaceSelectedElement {
   pageUrl: string;
 }
 
+export interface WorkspaceChatMessage {
+  id: string;
+  role: "assistant" | "user";
+  content: string;
+}
+
 export interface WorkspaceData {
   project: WorkspaceProject;
   revisions: WorkspaceRevision[];
