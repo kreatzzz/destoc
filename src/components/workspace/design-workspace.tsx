@@ -292,7 +292,6 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   }
 
   async function disconnectProject() {
-    if (!window.confirm(`Delete ${data.project.repository} from Destoc? This permanently deletes its Destoc reviews and revisions, but never the GitHub repository.`)) return;
     setIsDisconnecting(true);
     const response = await fetch(`/api/projects/${data.project.id}`, { method: "DELETE" });
     if (response.ok) router.push("/workspace");
@@ -306,18 +305,17 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     <div className="flex h-dvh min-h-[640px] flex-col overflow-hidden bg-[#111110] font-sans antialiased">
       <WorkspaceHeader
         project={data.project}
+        previewStatusText={previewStatusText}
+        previewError={previewError}
+        isPreviewStarting={isPreviewStarting}
         onDisconnect={() => void disconnectProject()}
         isDisconnecting={isDisconnecting}
       />
       <div className="flex min-h-0 flex-1">
         <WorkspaceChat
-          project={data.project}
           selectedElements={selectedElements}
           messages={messages}
           prompt={prompt}
-          previewStatusText={previewStatusText}
-          previewError={previewError}
-          isPreviewStarting={isPreviewStarting}
           isAuditPending={isAuditPending}
           auditError={auditError}
           onPromptChange={setPrompt}

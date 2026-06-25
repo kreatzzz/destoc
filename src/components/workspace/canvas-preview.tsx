@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { Loader2, MousePointer2 } from "lucide-react";
+import type { CursorClickIconHandle, EyeIconHandle } from "lucide-animated";
 
 import { AnimatedCursorClickIcon, AnimatedEyeIcon } from "@/components/ui/animated-icons";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ export function CanvasPreview({
   onSelectionChange,
 }: CanvasPreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const selectIconRef = useRef<CursorClickIconHandle>(null);
+  const inspectIconRef = useRef<EyeIconHandle>(null);
   const previewSource = useMemo(() => {
     if (!previewUrl) return undefined;
     return previewUrl;
@@ -103,16 +106,34 @@ export function CanvasPreview({
         <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="sm" variant="ghost" aria-pressed={designMode} onClick={() => setToolMode("select")} disabled={!previewUrl} className={cn("text-zinc-300 hover:bg-white/[0.08] hover:text-white", designMode && "bg-white/[0.08] text-white")}>
-                <AnimatedCursorClickIcon size={14} /> Select
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-pressed={designMode}
+                onClick={() => setToolMode("select")}
+                onMouseEnter={() => selectIconRef.current?.startAnimation()}
+                onMouseLeave={() => selectIconRef.current?.stopAnimation()}
+                disabled={!previewUrl}
+                className={cn("text-zinc-300 hover:bg-white/[0.08] hover:text-white", designMode && "bg-white/[0.08] text-white")}
+              >
+                <AnimatedCursorClickIcon ref={selectIconRef} size={14} animateOnHover={false} /> Select
               </Button>
             </TooltipTrigger>
             <TooltipContent>Select components in the preview</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="sm" variant="ghost" aria-pressed={!designMode} onClick={() => setToolMode("inspect")} disabled={!previewUrl} className={cn("text-zinc-500 hover:bg-white/[0.08] hover:text-white", !designMode && "bg-white/[0.08] text-white")}>
-                <AnimatedEyeIcon size={14} /> Inspect
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-pressed={!designMode}
+                onClick={() => setToolMode("inspect")}
+                onMouseEnter={() => inspectIconRef.current?.startAnimation()}
+                onMouseLeave={() => inspectIconRef.current?.stopAnimation()}
+                disabled={!previewUrl}
+                className={cn("text-zinc-500 hover:bg-white/[0.08] hover:text-white", !designMode && "bg-white/[0.08] text-white")}
+              >
+                <AnimatedEyeIcon ref={inspectIconRef} size={14} animateOnHover={false} /> Inspect
               </Button>
             </TooltipTrigger>
             <TooltipContent>Interact with the preview normally</TooltipContent>

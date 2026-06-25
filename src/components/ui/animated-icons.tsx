@@ -1,6 +1,6 @@
 "use client";
 
-import type { HTMLAttributes } from "react";
+import { forwardRef, type HTMLAttributes } from "react";
 import {
   ArrowRightIcon,
   ArrowUpIcon,
@@ -12,6 +12,8 @@ import {
   PlusIcon,
   SendIcon,
   XIcon,
+  type CursorClickIconHandle,
+  type EyeIconHandle,
 } from "lucide-animated";
 
 import { cn } from "@/lib/utils";
@@ -37,17 +39,21 @@ export function AnimatedArrowUpRightIcon({ className, size = 16, ...props }: Ani
   return <ArrowUpRightIcon size={size} className={iconClassName(className)} {...props} />;
 }
 
-export function AnimatedCursorClickIcon({ className, size = 16, ...props }: AnimatedIconProps) {
-  return <CursorClickIcon size={size} className={iconClassName(className)} {...props} />;
-}
+export const AnimatedCursorClickIcon = forwardRef<CursorClickIconHandle, AnimatedIconProps>(
+  function AnimatedCursorClickIcon({ className, size = 16, ...props }, ref) {
+    return <CursorClickIcon ref={ref} size={size} className={iconClassName(className)} {...props} />;
+  },
+);
 
 export function AnimatedDeleteIcon({ className, size = 16, ...props }: AnimatedIconProps) {
   return <DeleteIcon size={size} className={iconClassName(className)} {...props} />;
 }
 
-export function AnimatedEyeIcon({ className, size = 16, ...props }: AnimatedIconProps) {
-  return <EyeIcon size={size} className={iconClassName(className)} {...props} />;
-}
+export const AnimatedEyeIcon = forwardRef<EyeIconHandle, AnimatedIconProps>(
+  function AnimatedEyeIcon({ className, size = 16, ...props }, ref) {
+    return <EyeIcon ref={ref} size={size} className={iconClassName(className)} {...props} />;
+  },
+);
 
 export function AnimatedFolderOpenIcon({ className, size = 16, ...props }: AnimatedIconProps) {
   return <FolderOpenIcon size={size} className={iconClassName(className)} {...props} />;

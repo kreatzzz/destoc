@@ -1,18 +1,42 @@
-import { Sparkles } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
 import { AnimatedDeleteIcon } from "@/components/ui/animated-icons";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import type { WorkspaceProject } from "@/components/workspace/types";
 
 interface WorkspaceHeaderProps {
   project: WorkspaceProject;
+  previewStatusText: string;
+  previewError: string | null;
+  isPreviewStarting: boolean;
   onDisconnect: () => void;
   isDisconnecting: boolean;
 }
 
-export function WorkspaceHeader({ project, onDisconnect, isDisconnecting }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({
+  project,
+  previewStatusText,
+  previewError,
+  isPreviewStarting,
+  onDisconnect,
+  isDisconnecting,
+}: WorkspaceHeaderProps) {
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.07] bg-[#111110] px-3 text-zinc-300">
+    <header className="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-white/[0.07] bg-[#111110] px-3 text-zinc-300">
       <div className="flex min-w-0 items-center gap-2">
         <div className="grid size-7 place-items-center rounded-md bg-[#d7ff64] text-[#171916] shadow-[0_0_20px_rgba(215,255,100,0.14)]">
           <Sparkles className="size-3.5 fill-current" />
@@ -24,17 +48,54 @@ export function WorkspaceHeader({ project, onDisconnect, isDisconnecting }: Work
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={isDisconnecting}
-          onClick={onDisconnect}
-          className="gap-1.5 text-zinc-400 hover:bg-rose-500/10 hover:text-rose-200"
-        >
-          <AnimatedDeleteIcon size={14} />
-          {isDisconnecting ? "Deleting…" : "Delete project"}
-        </Button>
+      <div className="flex min-w-0 items-center justify-center">
+        <div className="flex max-w-[42vw] items-center gap-2 rounded-full bg-white/[0.04] px-2.5 py-1 text-xs text-zinc-400">
+          <span className={cn("size-1.5 shrink-0 rounded-full", previewError ? "bg-rose-400" : isPreviewStarting ? "bg-amber-300" : "bg-emerald-400")} />
+          <span className="truncate">{previewStatusText}</span>
+          {isPreviewStarting ? <Loader2 className="size-3 animate-spin text-zinc-500" /> : null}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <AlertDialog>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Delete project"
+                  disabled={isDisconnecting}
+                  className="text-zinc-500 hover:bg-rose-500/10 hover:text-rose-200"
+                >
+                  {isDisconnecting ? <Loader2 className="animate-spin" /> : <AnimatedDeleteIcon size={14} />}
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Delete project</TooltipContent>
+          </Tooltip>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogMedia className="bg-rose-500/10 text-rose-300">
+                <AnimatedDeleteIcon size={22} />
+              </AlertDialogMedia>
+              <AlertDialogTitle>Delete this project?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes {project.repository} from Destoc, including its saved reviews and revisions. It will not touch the GitHub repository.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDisconnecting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={isDisconnecting}
+                onClick={onDisconnect}
+              >
+                {isDisconnecting ? "Deleting…" : "Delete project"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </header>
   );
