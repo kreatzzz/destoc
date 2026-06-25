@@ -1,6 +1,7 @@
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { AnimatedDeleteIcon } from "@/components/ui/animated-icons";
+import { DestocLogo } from "@/components/app-shell/destoc-logo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,9 +39,7 @@ export function WorkspaceHeader({
   return (
     <header className="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-white/[0.07] bg-[#111110] px-3 text-zinc-300">
       <div className="flex min-w-0 items-center gap-2">
-        <div className="grid size-7 place-items-center rounded-md bg-[#d7ff64] text-[#171916] shadow-[0_0_20px_rgba(215,255,100,0.14)]">
-          <Sparkles className="size-3.5 fill-current" />
-        </div>
+        <DestocLogo className="h-7 min-w-7 rounded-[0.55rem]" markClassName="text-[19px]" />
         <div className="hidden min-w-0 items-center gap-2 sm:flex">
           <span className="text-sm font-semibold tracking-[-0.03em] text-zinc-100">Destoc</span>
           <span className="text-zinc-700">/</span>
@@ -50,7 +49,7 @@ export function WorkspaceHeader({
 
       <div className="flex min-w-0 items-center justify-center">
         <div className="flex max-w-[42vw] items-center gap-2 rounded-full bg-white/[0.04] px-2.5 py-1 text-xs text-zinc-400">
-          <span className={cn("size-1.5 shrink-0 rounded-full", previewError ? "bg-rose-400" : isPreviewStarting ? "bg-amber-300" : "bg-emerald-400")} />
+          <span className={cn("size-1.5 shrink-0 rounded-full", previewError ? "bg-rose-400" : isPreviewStarting ? "bg-amber-300" : "bg-[#f7ca58]")} />
           <span className="truncate">{previewStatusText}</span>
           {isPreviewStarting ? <Loader2 className="size-3 animate-spin text-zinc-500" /> : null}
         </div>

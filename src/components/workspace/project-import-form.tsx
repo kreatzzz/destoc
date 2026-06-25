@@ -34,7 +34,7 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
         <Input id="branch" name="defaultBranch" defaultValue="main" maxLength={255} />
       </div>
       {state.message ? <p role="alert" className="text-sm text-destructive">{state.message}</p> : null}
-      {state.ok ? <p role="status" className="text-sm text-emerald-400">Repository imported. Opening workspace…</p> : null}
+      {state.ok ? <p role="status" className="text-sm text-[#f7ca58]">Repository imported. Opening workspace…</p> : null}
       <Button type="submit" disabled={isPending}>{isPending ? "Importing…" : "Import repository"}</Button>
     </form>
   );

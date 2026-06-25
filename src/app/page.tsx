@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 
+import { DestocLogo } from "@/components/app-shell/destoc-logo";
 import { AnimatedArrowRightIcon } from "@/components/ui/animated-icons";
 import { Button } from "@/components/ui/button";
 
@@ -9,9 +9,7 @@ export default function HomePage() {
     <main className="grid min-h-dvh place-items-center bg-background p-6">
       <section className="w-full max-w-sm rounded-xl border bg-card p-6 shadow-2xl shadow-black/20">
         <div className="mb-7 flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
-            <Sparkles className="size-4" />
-          </span>
+          <DestocLogo />
           <span className="font-semibold tracking-tight">Destoc</span>
         </div>
         <h1 className="text-xl font-semibold tracking-tight">Design review workspace</h1>

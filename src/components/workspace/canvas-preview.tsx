@@ -111,7 +111,7 @@ export function CanvasPreview({
       ) : (
         <div className="grid h-full place-items-center bg-[#f8f8f4] p-8 text-center text-zinc-950">
           <div className="max-w-sm">
-            <div className="mx-auto mb-4 grid size-10 place-items-center rounded-full bg-zinc-950 text-[#d7ff64]">
+            <div className="mx-auto mb-4 grid size-10 place-items-center rounded-full bg-zinc-950 text-[#f7ca58]">
               {isPreviewStarting ? <Loader2 className="size-4 animate-spin" /> : <MousePointer2 className="size-4" />}
             </div>
             <h2 className="text-lg font-medium">{previewStatusText}</h2>

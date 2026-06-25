@@ -59,7 +59,7 @@ export function WorkspaceChat({
     <aside className="flex h-full w-[360px] shrink-0 flex-col border-r border-white/[0.07] bg-[#111110] text-zinc-200">
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.map((message) => (
-          <div key={message.id} className={cn("px-3 py-2.5 text-sm leading-6", message.role === "user" ? "ml-8 bg-[#d7ff64] text-[#171916]" : "mr-8 bg-white/[0.04] text-zinc-300")}>
+          <div key={message.id} className={cn("px-3 py-2.5 text-sm leading-6", message.role === "user" ? "ml-8 bg-[#f7ca58] text-[#1b1205]" : "mr-8 bg-white/[0.04] text-zinc-300")}>
             {message.content}
           </div>
         ))}
@@ -76,8 +76,8 @@ export function WorkspaceChat({
                   className={cn(
                     "group inline-flex min-w-0 max-w-[112px] items-center justify-center gap-1.5 rounded-full px-1 py-1 text-center text-[11px] transition-[background-color,color,box-shadow] duration-150",
                     activeSelection?.selector === element.selector
-                      ? "bg-[#d7ff64] text-[#171916] shadow-[0_0_18px_rgba(215,255,100,0.12)]"
-                      : "bg-[#d7ff64]/10 text-[#e4ff9d] hover:bg-[#d7ff64]/15",
+                      ? "bg-[#f7ca58] text-[#1b1205] shadow-[0_0_18px_rgba(247,202,88,0.14)]"
+                      : "bg-[#f7ca58]/10 text-[#ffd879] hover:bg-[#f7ca58]/15",
                   )}
                 >
                   <button
@@ -116,7 +116,7 @@ export function WorkspaceChat({
           <div className="mb-2 bg-white/[0.035] p-2">
             <div className="mb-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-zinc-500">
               <span className="truncate">
-                Note for <span className="font-mono tabular-nums text-[#d7ff64]">#{activeSelectionNumber}</span> {elementLabel(activeSelection)}
+                Note for <span className="font-mono tabular-nums text-[#f7ca58]">#{activeSelectionNumber}</span> {elementLabel(activeSelection)}
               </span>
               <span className="shrink-0 text-zinc-600">saved</span>
             </div>
@@ -145,7 +145,7 @@ export function WorkspaceChat({
             <p className="text-[10px] text-zinc-600">⌘ Enter to send</p>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon-sm" aria-label="Send prompt" disabled={!canSend} onClick={onSendPrompt} className="bg-[#d7ff64] text-[#171916] hover:bg-[#e3ff94]">
+                <Button size="icon-sm" aria-label="Send prompt" disabled={!canSend} onClick={onSendPrompt} className="bg-[#f7ca58] text-[#1b1205] hover:bg-[#ffd879]">
                   {isAuditPending ? <Loader2 className="animate-spin" /> : <AnimatedArrowUpIcon />}
                 </Button>
               </TooltipTrigger>
