@@ -39,7 +39,6 @@ export default async function WorkspacePage() {
           <div className="flex min-w-0 items-center gap-3">
             <DestocLogo className="h-9 min-w-9" markClassName="text-[25px]" />
             <div className="min-w-0">
-              <p className="truncate text-xs uppercase tracking-[0.24em] text-zinc-600">{activeWorkspace?.name ?? "Design workspace"}</p>
               <h1 className="mt-1 text-xl font-semibold tracking-[-0.04em] text-zinc-50">Repository control</h1>
             </div>
           </div>
@@ -51,7 +50,7 @@ export default async function WorkspacePage() {
         {!activeWorkspace ? <WorkspaceOnboarding /> : (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
             <section className="grid content-start gap-5">
-              <div className="overflow-hidden rounded-3xl bg-white/[0.045] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.07),0_24px_80px_rgba(0,0,0,0.32)]">
+              <div className="bg-white/[0.045] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.07),0_24px_80px_rgba(0,0,0,0.32)]">
                 <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
                   <div className="max-w-xl">
                     <Badge variant="outline" className="border-[#f7ca58]/20 bg-[#f7ca58]/10 text-[#f7ca58]">

@@ -28,7 +28,7 @@ export type DesignReviewRequest = {
 };
 
 export interface DesignReviewProvider {
-  readonly id: "mock" | "deepseek";
+  readonly id: "mock" | "deepseek" | "local";
   review(request: DesignReviewRequest): Promise<DesignReviewResult>;
 }
 
@@ -94,6 +94,81 @@ class DeepSeekProviderPlaceholder implements DesignReviewProvider {
   }
 }
 
+class LocalOpenAICompatibleProvider implements DesignReviewProvider {
+  readonly id = "local" as const;
+
+  constructor(
+    private readonly baseUrl: string,
+    private readonly model: string,
+    private readonly apiKey?: string,
+  ) {}
+
+  private parseProviderContent(content: string): DesignReviewResult {
+    const trimmed = content.trim();
+    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    const candidate = fencedMatch?.[1] ?? trimmed;
+    const start = candidate.indexOf("{");
+    const end = candidate.lastIndexOf("}");
+    const jsonText = start >= 0 && end > start ? candidate.slice(start, end + 1) : candidate;
+
+    return designReviewResultSchema.parse(JSON.parse(jsonText));
+  }
+
+  async review(request: DesignReviewRequest): Promise<DesignReviewResult> {
+    const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model: this.model,
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content: [
+              "You are Destoc's design-review provider.",
+              "Return only JSON matching this shape:",
+              "{\"summary\":\"string\",\"suggestions\":[{\"severity\":\"low|medium|high\",\"confidence\":0.8,\"title\":\"string\",\"issue\":\"string\",\"rationale\":\"string\",\"intendedOutcome\":\"string\",\"verificationChecklist\":[\"string\"]}]}",
+              "Keep suggestions practical, visual, and based only on the supplied evidence.",
+              "Do not include markdown fences.",
+            ].join(" "),
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              scope: request.scope,
+              prompt: request.prompt,
+              evidence: request.evidence,
+            }),
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new AppError("CONFIGURATION_ERROR", `Local review provider failed with HTTP ${response.status}.`);
+    }
+
+    const payload = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = payload.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new AppError("CONFIGURATION_ERROR", "Local review provider returned an empty response.");
+    }
+
+    try {
+      return this.parseProviderContent(content);
+    } catch (error) {
+      throw new AppError("CONFIGURATION_ERROR", "Local review provider returned invalid review JSON.", {
+        cause: error,
+      });
+    }
+  }
+}
+
 export function getDesignReviewProvider(): DesignReviewProvider {
   const env = getServerEnv();
 
@@ -102,6 +177,13 @@ export function getDesignReviewProvider(): DesignReviewProvider {
       throw new AppError("CONFIGURATION_ERROR", "DEEPSEEK_API_KEY is required for the DeepSeek provider.");
     }
     return new DeepSeekProviderPlaceholder();
+  }
+
+  if (env.DESIGN_REVIEW_PROVIDER === "local") {
+    if (!env.LOCAL_AI_BASE_URL) {
+      throw new AppError("CONFIGURATION_ERROR", "LOCAL_AI_BASE_URL is required for the local review provider.");
+    }
+    return new LocalOpenAICompatibleProvider(env.LOCAL_AI_BASE_URL, env.LOCAL_AI_MODEL, env.LOCAL_AI_API_KEY);
   }
 
   return mockDesignReviewProvider;

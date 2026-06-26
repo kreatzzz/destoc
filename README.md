@@ -43,8 +43,21 @@ bunx prisma validate
 
 See `.env.example`. `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID` are required only when running imported repositories in Vercel Sandbox. `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are mandatory in production.
 
+### Local review provider
+
+For API-key-free experiments, keep `DESIGN_REVIEW_PROVIDER="mock"`. To test real provider plumbing against a local or proxy server, run any OpenAI-compatible `/chat/completions` endpoint and set:
+
+```bash
+DESIGN_REVIEW_PROVIDER="local"
+LOCAL_AI_BASE_URL="http://localhost:11434/v1"
+LOCAL_AI_MODEL="your-model"
+LOCAL_AI_API_KEY=""
+```
+
+Do not point this at cached Codex or ChatGPT session tokens. Destoc only supports explicit provider endpoints and explicit env-provided credentials.
+
 ## Current limitations
 
-- The deterministic mock provider is deliberate until a live `DeepSeekDesignReviewProvider` is added. The provider contract and `DEEPSEEK_API_KEY` configuration boundary are ready; live generation is not yet implemented.
+- The deterministic mock provider remains the safest free default. A local OpenAI-compatible provider is available for experiments, and the DeepSeek provider boundary exists, but the production DeepSeek integration is not yet implemented.
 - Only common public Next.js/Vite-style repositories are in scope. Private repositories, GitHub OAuth, GitHub write-back/PRs, webhooks, and scheduled reviews are deferred.
 - `DESIGN.md` is intentionally deferred until core product work is approved, per project guidance.

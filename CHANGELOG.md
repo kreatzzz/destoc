@@ -16,6 +16,7 @@ All notable project decisions and changes are recorded here.
 - Vitest coverage for GitHub source validation, selected-element payload bounds, and patch safety.
 - Docker Compose PostgreSQL development service, initial Prisma migration, and automatic `.env` loading for Prisma commands and seeds.
 - A visible destructive project deletion action that removes only Destoc-owned project data, never the GitHub repository.
+- Local OpenAI-compatible design review provider support for experiments without DeepSeek API usage.
 
 ### Changed
 
@@ -36,6 +37,7 @@ All notable project decisions and changes are recorded here.
 - Workspace branding now uses a compact `D.` wordmark and a warmer golden accent palette instead of the previous acid green.
 - The workspace logo now renders as a minimal yellow wordmark without a containing badge.
 - The workspace index now uses a denser project dashboard with status summaries, polished import surfaces, and icon-only project deletion.
+- The workspace index hero now removes the workspace-name eyebrow and boxy rounded/overflow card treatment per design feedback.
 
 ### Deferred
 

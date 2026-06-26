@@ -7,6 +7,12 @@ const optionalUrl = z
   .or(z.literal(""))
   .transform((value) => value || undefined);
 
+const optionalString = z
+  .string()
+  .optional()
+  .or(z.literal(""))
+  .transform((value) => value || undefined);
+
 const serverEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid PostgreSQL connection URL"),
@@ -16,8 +22,11 @@ const serverEnvSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional().or(z.literal("")),
   VERCEL_TOKEN: z.string().optional().or(z.literal("")),
   BLOB_READ_WRITE_TOKEN: z.string().optional().or(z.literal("")),
-  DESIGN_REVIEW_PROVIDER: z.enum(["mock", "deepseek"]).default("mock"),
-  DEEPSEEK_API_KEY: z.string().optional().or(z.literal("")),
+  DESIGN_REVIEW_PROVIDER: z.enum(["mock", "deepseek", "local"]).default("mock"),
+  DEEPSEEK_API_KEY: optionalString,
+  LOCAL_AI_BASE_URL: optionalUrl,
+  LOCAL_AI_API_KEY: optionalString,
+  LOCAL_AI_MODEL: z.string().optional().or(z.literal("")).transform((value) => value || "local-model"),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -41,6 +50,9 @@ export function getServerEnv(): ServerEnv {
       BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
       DESIGN_REVIEW_PROVIDER: process.env.DESIGN_REVIEW_PROVIDER,
       DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
+      LOCAL_AI_BASE_URL: process.env.LOCAL_AI_BASE_URL,
+      LOCAL_AI_API_KEY: process.env.LOCAL_AI_API_KEY,
+      LOCAL_AI_MODEL: process.env.LOCAL_AI_MODEL,
     });
   }
 
