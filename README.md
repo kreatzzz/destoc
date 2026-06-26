@@ -61,11 +61,12 @@ If you want to experiment with a local command bridge, Destoc can invoke an expl
 ```bash
 DESIGN_REVIEW_PROVIDER="command"
 COMMAND_AI_BIN="codex"
-COMMAND_AI_ARGS='["exec","--sandbox","read-only","--ask-for-approval","never","--ephemeral","-"]'
+COMMAND_AI_ARGS='["exec","--model","gpt-5.4","-c","model_reasoning_effort=\"medium\"","--sandbox","read-only","--ask-for-approval","never","--ephemeral","-"]'
 COMMAND_AI_TIMEOUT_MS="120000"
 ```
 
 This path relies on your local CLI being authenticated already. It does not inspect or copy cached Codex credentials, and it is disabled in production unless `ALLOW_COMMAND_REVIEW_PROVIDER="true"` is set.
+The example pins Destoc to `gpt-5.4` with medium reasoning without changing your Codex CLI defaults.
 
 ## Current limitations
 

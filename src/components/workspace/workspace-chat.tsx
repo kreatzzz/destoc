@@ -59,7 +59,7 @@ export function WorkspaceChat({
     <aside className="flex h-full w-[360px] shrink-0 flex-col border-r border-white/[0.07] bg-[#111110] text-zinc-200">
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.map((message) => (
-          <div key={message.id} className={cn("px-3 py-2.5 text-sm leading-6", message.role === "user" ? "ml-8 bg-[#f7ca58] text-[#1b1205]" : "mr-8 bg-white/[0.04] text-zinc-300")}>
+          <div key={message.id} className={cn("rounded-lg px-3 py-2.5 text-sm leading-6", message.role === "user" ? "ml-8 bg-[#f7ca58] text-[#1b1205]" : "mr-8 bg-white/[0.04] text-zinc-300")}>
             {message.content}
           </div>
         ))}
@@ -113,7 +113,7 @@ export function WorkspaceChat({
           )}
         </div>
         {activeSelection ? (
-          <div className="mb-2 bg-white/[0.035] p-2">
+          <div className="mb-2 rounded-xl bg-white/[0.035] p-2">
             <div className="mb-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-zinc-500">
               <span className="truncate">
                 Note for <span className="font-mono tabular-nums text-[#f7ca58]">#{activeSelectionNumber}</span> {elementLabel(activeSelection)}
@@ -128,7 +128,7 @@ export function WorkspaceChat({
             />
           </div>
         ) : null}
-        <div className="bg-black/20 p-2">
+        <div className="rounded-xl bg-black/20 p-2">
           <Textarea
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}

@@ -39,6 +39,7 @@ All notable project decisions and changes are recorded here.
 - The workspace index now uses a denser project dashboard with status summaries, polished import surfaces, and icon-only project deletion.
 - The workspace index hero now removes the workspace-name eyebrow and boxy rounded/overflow card treatment per design feedback.
 - The workspace index now uses a minimal colored/padded project count strip and removes extra explanatory copy.
+- The command review provider example now pins Destoc to `gpt-5.4` with medium reasoning, and workspace chat surfaces use concentric rounding.
 
 ### Deferred
 
