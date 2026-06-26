@@ -31,17 +31,21 @@ bun run build
 bunx prisma validate
 ```
 
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the Coolify/Docker runbook. The app ships with a Dockerfile, standalone Next.js output, runtime Prisma migrations, and `/api/health` for container health checks.
+
 ## Security and execution model
 
 - Every workspace, project, review, suggestion, and revision is checked against the authenticated owner server-side.
 - Public HTTPS GitHub repository URLs are the only accepted source type. No GitHub token or repository write access is used.
-- Sandbox/review/mutation/auth requests are rate limited. Production requires Upstash; local development uses a process-local fallback only.
+- Sandbox/review/mutation/auth requests are rate limited. Production should use Upstash; a single-instance home-server deploy can explicitly enable the process-local fallback with `ALLOW_IN_MEMORY_RATE_LIMIT="true"`.
 - Suggested patches are limited to one selected UI file under `src/app` or `src/components`; environment files, package files, lockfiles, and traversal paths are rejected.
 - Vercel Sandbox credentials stay in the host process. Imported code receives no application credentials, and its egress is denied after dependency installation.
 
 ## Environment
 
-See `.env.example`. `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID` are required only when running imported repositories in Vercel Sandbox. `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are mandatory in production.
+See `.env.example`. `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID` are required only when running imported repositories in Vercel Sandbox. `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are recommended for production rate limiting; use `ALLOW_IN_MEMORY_RATE_LIMIT="true"` only for a single trusted instance.
 
 ### Local review provider
 

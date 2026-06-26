@@ -46,6 +46,8 @@ All notable project decisions and changes are recorded here.
 - Workspace top bar now includes restart/stop sandbox controls and a code-changes pane toggle.
 - Added a deterministic selected-text replacement fallback for simple copy edits, made the code pane show code diffs only, added an animated drafting bubble, and clear selected components immediately after prompt submission.
 - Workspace chat and code-diff panes are now horizontally resizable, and the code pane opens/closes with an interruptible width/opacity transition while the center sandbox preview flexes responsively.
+- Added Coolify-friendly Docker deployment support with standalone Next.js output, startup Prisma migrations, a container health endpoint, `.dockerignore`, and a deployment runbook.
+- Production rate limiting now supports an explicit single-instance home-server fallback via `ALLOW_IN_MEMORY_RATE_LIMIT`; Upstash remains the recommended distributed limiter.
 
 ### Deferred
 

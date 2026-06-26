@@ -79,10 +79,10 @@ export async function checkRateLimit(
     };
   }
 
-  if (getServerEnv().NODE_ENV === "production") {
+  if (getServerEnv().NODE_ENV === "production" && !getServerEnv().ALLOW_IN_MEMORY_RATE_LIMIT) {
     throw new AppError(
       "CONFIGURATION_ERROR",
-      "Upstash Redis is required for rate limiting in production.",
+      "Upstash Redis is required for rate limiting in production unless ALLOW_IN_MEMORY_RATE_LIMIT is explicitly enabled.",
     );
   }
 
