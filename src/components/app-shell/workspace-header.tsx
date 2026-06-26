@@ -1,21 +1,9 @@
 import { Loader2, PanelRightClose, PanelRightOpen, RotateCcw, Square } from "lucide-react";
 
-import { AnimatedDeleteIcon } from "@/components/ui/animated-icons";
 import { DestocLogo } from "@/components/app-shell/destoc-logo";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { WorkspaceLogoutButton } from "@/components/workspace/workspace-logout-button";
 import { cn } from "@/lib/utils";
 import type { WorkspaceProject } from "@/components/workspace/types";
 
@@ -24,8 +12,6 @@ interface WorkspaceHeaderProps {
   previewStatusText: string;
   previewError: string | null;
   isPreviewStarting: boolean;
-  onDisconnect: () => void;
-  isDisconnecting: boolean;
   onRestartSandbox: () => void;
   onStopSandbox: () => void;
   canStopSandbox: boolean;
@@ -40,8 +26,6 @@ export function WorkspaceHeader({
   previewStatusText,
   previewError,
   isPreviewStarting,
-  onDisconnect,
-  isDisconnecting,
   onRestartSandbox,
   onStopSandbox,
   canStopSandbox,
@@ -118,45 +102,7 @@ export function WorkspaceHeader({
           </TooltipTrigger>
           <TooltipContent>{codePaneOpen ? "Hide code changes" : "Show code changes"}</TooltipContent>
         </Tooltip>
-        <AlertDialog>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Delete project"
-                  disabled={isDisconnecting}
-                  className="text-zinc-500 hover:bg-rose-500/10 hover:text-rose-200"
-                >
-                  {isDisconnecting ? <Loader2 className="animate-spin" /> : <AnimatedDeleteIcon size={14} />}
-                </Button>
-              </AlertDialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Delete project</TooltipContent>
-          </Tooltip>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogMedia className="bg-rose-500/10 text-rose-300">
-                <AnimatedDeleteIcon size={22} />
-              </AlertDialogMedia>
-              <AlertDialogTitle>Delete this project?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This removes {project.repository} from Destoc, including its saved reviews and revisions. It will not touch the GitHub repository.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDisconnecting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                disabled={isDisconnecting}
-                onClick={onDisconnect}
-              >
-                {isDisconnecting ? "Deleting…" : "Delete project"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <WorkspaceLogoutButton />
       </div>
     </header>
   );

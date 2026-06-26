@@ -165,7 +165,6 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const [chatWidth, setChatWidth] = useState(defaultChatWidth);
   const [codePaneWidth, setCodePaneWidth] = useState(defaultCodePaneWidth);
   const [isStoppingPreview, setIsStoppingPreview] = useState(false);
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const activeRunRef = useRef<string | undefined>(data.preview?.runId);
   const startingRef = useRef(false);
   const autoStartAttemptedRef = useRef(false);
@@ -504,16 +503,6 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     }
   }
 
-  async function disconnectProject() {
-    setIsDisconnecting(true);
-    const response = await fetch(`/api/projects/${data.project.id}`, { method: "DELETE" });
-    if (response.ok) router.push("/workspace");
-    else {
-      setPreviewError("Project could not be deleted.");
-      setIsDisconnecting(false);
-    }
-  }
-
   return (
     <div className="flex h-dvh min-h-[640px] flex-col overflow-hidden bg-[#111110] font-sans antialiased">
       <WorkspaceHeader
@@ -521,8 +510,6 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
         previewStatusText={previewStatusText}
         previewError={previewError}
         isPreviewStarting={isPreviewStarting}
-        onDisconnect={() => void disconnectProject()}
-        isDisconnecting={isDisconnecting}
         onRestartSandbox={() => void restartPreview()}
         onStopSandbox={() => void stopPreview()}
         canStopSandbox={canStopPreview}
