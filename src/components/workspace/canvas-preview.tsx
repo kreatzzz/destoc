@@ -13,6 +13,7 @@ import type { WorkspaceSelectedElement } from "./types";
 interface CanvasPreviewProps {
   designMode: boolean;
   previewUrl?: string;
+  previewReloadKey: number;
   selectedElements: WorkspaceSelectedElement[];
   previewStatusText: string;
   previewError: string | null;
@@ -24,6 +25,7 @@ interface CanvasPreviewProps {
 export function CanvasPreview({
   designMode,
   previewUrl,
+  previewReloadKey,
   selectedElements,
   previewStatusText,
   previewError,
@@ -99,7 +101,7 @@ export function CanvasPreview({
     <main className="relative min-w-0 flex-1 overflow-hidden bg-white">
       {previewUrl ? (
         <iframe
-          key={previewUrl}
+          key={`${previewUrl}:${previewReloadKey}`}
           ref={iframeRef}
           title="Repository preview"
           src={previewSource}

@@ -10,6 +10,13 @@ export type SourceContext = {
   note: string;
 };
 
+type InferredPatch = {
+  patch: string;
+  title: string;
+  issue: string;
+  intendedOutcome: string;
+};
+
 const sourcePathPattern = /^(?:src\/)?(?:app|components|data|content|lib)\/.+\.(?:tsx|jsx|ts|js|css|json|mdx?)$/;
 const maxFilesToFetch = 80;
 const maxCandidates = 8;
@@ -44,14 +51,15 @@ const stopWords = new Set([
   "with",
 ]);
 
-function selectedElementsFromContext(domContext: unknown): Array<{ text?: string; note?: string; role?: string }> {
+function selectedElementsFromContext(domContext: unknown): Array<{ selector?: string; text?: string; note?: string; role?: string }> {
   if (!domContext || typeof domContext !== "object") return [];
   const selectedElements = (domContext as { selectedElements?: unknown }).selectedElements;
   if (!Array.isArray(selectedElements)) return [];
 
   return selectedElements
-    .filter((element): element is { text?: string; note?: string; role?: string } => Boolean(element) && typeof element === "object")
+    .filter((element): element is { selector?: string; text?: string; note?: string; role?: string } => Boolean(element) && typeof element === "object")
     .map((element) => ({
+      selector: typeof element.selector === "string" ? element.selector : undefined,
       text: typeof element.text === "string" ? element.text : undefined,
       note: typeof element.note === "string" ? element.note : undefined,
       role: typeof element.role === "string" ? element.role : undefined,
@@ -61,12 +69,26 @@ function selectedElementsFromContext(domContext: unknown): Array<{ text?: string
 function selectedElementsForReplacement(target: ReviewTarget & { element: SelectedElement | null }) {
   const selectedElements = selectedElementsFromContext(target.domContext);
   if (target.element) {
-    selectedElements.unshift({
+    const matchingContext = selectedElements.find((element) => (
+      element.text?.trim() && target.element?.text?.trim()
+        ? element.text.trim() === target.element.text.trim()
+        : element.role && element.role === target.element?.role
+    ));
+    const focusedElement = {
       text: target.element.text ?? undefined,
       role: target.element.role ?? undefined,
-    });
+      note: matchingContext?.note,
+    };
+
+    return [
+      focusedElement,
+      ...selectedElements.filter((element) => (
+        element.note?.trim() &&
+        (element.text?.trim() !== focusedElement.text?.trim() || element.note.trim() !== focusedElement.note?.trim())
+      )),
+    ];
   }
-  return selectedElements;
+  return selectedElements.filter((element) => element.note?.trim());
 }
 
 function wordsFrom(value: string | undefined) {
@@ -152,11 +174,41 @@ function linePatch(path: string, lineIndex: number, oldLine: string, newLine: st
   ].join("\n");
 }
 
-export function inferSimpleTextReplacementPatch(
+function multiLinePatch(changes: Array<{ path: string; lineIndex: number; oldLine: string; newLine: string }>) {
+  const sections = new Map<string, Array<{ lineIndex: number; oldLine: string; newLine: string }>>();
+  for (const change of changes) {
+    const fileChanges = sections.get(change.path) ?? [];
+    fileChanges.push(change);
+    sections.set(change.path, fileChanges);
+  }
+
+  return [...sections.entries()].flatMap(([path, fileChanges]) => [
+    `--- a/${path}`,
+    `+++ b/${path}`,
+    ...fileChanges
+      .sort((a, b) => a.lineIndex - b.lineIndex)
+      .flatMap((change) => [
+        `@@ -${change.lineIndex + 1},1 +${change.lineIndex + 1},1 @@`,
+        `-${change.oldLine}`,
+        `+${change.newLine}`,
+      ]),
+  ]).join("\n");
+}
+
+export function inferSimpleTextReplacementPatches(
   sourceContext: SourceContext,
   target: ReviewTarget & { element: SelectedElement | null },
-) {
+): InferredPatch[] {
   const selectedElements = selectedElementsForReplacement(target);
+  const changes: Array<{
+    path: string;
+    lineIndex: number;
+    oldLine: string;
+    newLine: string;
+    currentTexts: string[];
+    replacements: string[];
+  }> = [];
+  const seenChanges = new Set<string>();
 
   for (const element of selectedElements) {
     const currentText = element.text?.trim();
@@ -169,19 +221,67 @@ export function inferSimpleTextReplacementPatch(
       if (lineIndex === -1) continue;
 
       const oldLine = lines[lineIndex];
-      const newLine = oldLine.replace(new RegExp(escapeRegExp(currentText), "g"), replacement);
-      if (oldLine === newLine) continue;
+      const changeKey = `${candidate.path}:${lineIndex}:${currentText}:${replacement}`;
+      if (seenChanges.has(changeKey)) continue;
 
-      return {
-        patch: linePatch(candidate.path, lineIndex, oldLine, newLine),
-        title: `Rename “${currentText}” to “${replacement}”`,
-        issue: `The selected copy reads “${currentText}”; the prompt asks to rename it to “${replacement}”.`,
-        intendedOutcome: `Update the rendered copy to “${replacement}”.`,
-      };
+      const existingLineChange = changes.find((change) => (
+        change.path === candidate.path && change.lineIndex === lineIndex
+      ));
+      const baseLine = existingLineChange?.newLine ?? oldLine;
+      const newLine = baseLine.replace(new RegExp(escapeRegExp(currentText), "g"), replacement);
+      if (baseLine === newLine) continue;
+      seenChanges.add(changeKey);
+
+      if (existingLineChange) {
+        existingLineChange.newLine = newLine;
+        existingLineChange.currentTexts.push(currentText);
+        existingLineChange.replacements.push(replacement);
+      } else {
+        changes.push({
+          path: candidate.path,
+          lineIndex,
+          oldLine,
+          newLine,
+          currentTexts: [currentText],
+          replacements: [replacement],
+        });
+      }
+      break;
     }
+
+    if (changes.length >= 3) break;
   }
 
-  return null;
+  if (changes.length === 0) return [];
+
+  const selectedChangeCount = changes.reduce((count, change) => count + change.currentTexts.length, 0);
+
+  if (selectedChangeCount === 1) {
+    const change = changes[0]!;
+    const currentText = change.currentTexts[0]!;
+    const replacement = change.replacements[0]!;
+    return [{
+      patch: linePatch(change.path, change.lineIndex, change.oldLine, change.newLine),
+      title: `Rename “${currentText}” to “${replacement}”`,
+      issue: `The selected copy reads “${currentText}”; the prompt asks to rename it to “${replacement}”.`,
+      intendedOutcome: `Update the rendered copy to “${replacement}”.`,
+    }];
+  }
+
+  const changedLabels = changes.flatMap((change) => change.currentTexts).map((text) => `“${text}”`).join(", ");
+  return [{
+    patch: multiLinePatch(changes),
+    title: `Apply ${selectedChangeCount} selected text changes`,
+    issue: `The selected component notes requested copy changes for ${changedLabels}.`,
+    intendedOutcome: "Update all selected copy changes in one patch so the preview stays in sync.",
+  }];
+}
+
+export function inferSimpleTextReplacementPatch(
+  sourceContext: SourceContext,
+  target: ReviewTarget & { element: SelectedElement | null },
+) {
+  return inferSimpleTextReplacementPatches(sourceContext, target)[0] ?? null;
 }
 
 function contentScore(path: string, content: string, exactPhrases: string[], words: string[]) {

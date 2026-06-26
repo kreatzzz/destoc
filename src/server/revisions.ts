@@ -3,7 +3,7 @@ import { getPrisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { rejectSuggestionSchema } from "@/lib/schemas";
 import { requireSuggestionOwnership } from "@/server/authorization";
-import { assertPatchIsAllowed } from "@/server/patches";
+import { assertPatchIsAllowed, normalizeUnifiedDiff } from "@/server/patches";
 import { enforceRateLimit } from "@/server/rate-limit";
 
 const allowedRevisionTransitions: Record<RevisionStatus, readonly RevisionStatus[]> = {
@@ -24,7 +24,8 @@ export async function acceptSuggestion(userId: string, suggestionId: string) {
     throw new AppError("VALIDATION_ERROR", "This suggestion does not include a safe patch to apply.");
   }
 
-  assertPatchIsAllowed(suggestion.patch, suggestion.review.reviewTarget.sourceFilePath ?? undefined);
+  const normalizedPatch = normalizeUnifiedDiff(suggestion.patch);
+  assertPatchIsAllowed(normalizedPatch, suggestion.review.reviewTarget.sourceFilePath ?? undefined);
 
   return getPrisma().$transaction(async (transaction) => {
     const changed = await transaction.suggestion.updateMany({
@@ -35,18 +36,17 @@ export async function acceptSuggestion(userId: string, suggestionId: string) {
       throw new AppError("CONFLICT", "This suggestion was already decided.");
     }
 
-    // A revision always receives a fresh run. Workers may copy the immutable
-    // source commit into this run, apply the persisted patch, and attach assets.
-    const sandboxRun = await transaction.sandboxRun.create({
-      data: { projectId: suggestion.review.projectId, status: "QUEUED" },
-    });
+    const sandboxRunId = suggestion.review.reviewTarget.sandboxRunId;
+    if (!sandboxRunId) {
+      throw new AppError("CONFLICT", "This suggestion is not attached to a live sandbox preview.");
+    }
 
     return transaction.revision.create({
       data: {
         projectId: suggestion.review.projectId,
         suggestionId: suggestion.id,
-        sandboxRunId: sandboxRun.id,
-        patch: suggestion.patch!,
+        sandboxRunId,
+        patch: normalizedPatch,
         status: "QUEUED",
       },
       include: { sandboxRun: true, beforeScreenshot: true, afterScreenshot: true },

@@ -103,7 +103,7 @@ export function WorkspaceChat({
 
   return (
     <aside
-      className="relative flex h-full shrink-0 flex-col border-r border-white/[0.07] bg-[#111110] text-zinc-200"
+      className="relative flex h-full shrink-0 flex-col border-r border-white/[0.07] bg-[#10100f] text-zinc-200"
       style={{ width }}
     >
       <div
@@ -113,10 +113,18 @@ export function WorkspaceChat({
         onPointerDown={startResize}
         className="absolute right-0 top-0 z-20 h-full w-2 cursor-col-resize touch-none bg-transparent transition-[background-color] duration-150 hover:bg-[#f7ca58]/20"
       />
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
         {messages.map((message) => (
-          <div key={message.id} className={cn("rounded-lg px-3 py-2.5 text-sm leading-6", message.role === "user" ? "ml-8 bg-[#f7ca58] text-[#1b1205]" : "mr-8 bg-white/[0.04] text-zinc-300")}>
-            {message.content}
+          <div
+            key={message.id}
+            className={cn(
+              "group rounded-xl px-3 py-2 text-sm leading-6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]",
+              message.role === "user"
+                ? "ml-10 bg-[#f7ca58] text-[#1b1205]"
+                : "mr-6 bg-white/[0.035] text-zinc-300",
+            )}
+          >
+            <p className="whitespace-pre-wrap text-pretty">{message.content}</p>
           </div>
         ))}
         {changeSuggestions.map((suggestion) => {
@@ -127,18 +135,18 @@ export function WorkspaceChat({
           return (
             <article
               key={suggestion.id}
-              className="mr-4 rounded-2xl bg-white/[0.045] p-3 text-sm text-zinc-300 shadow-[0_14px_40px_rgba(0,0,0,0.18),inset_0_0_0_1px_rgba(255,255,255,0.07)]"
+              className="mr-3 rounded-2xl bg-[#181817] p-3 text-sm text-zinc-300 shadow-[0_14px_40px_rgba(0,0,0,0.18),inset_0_0_0_1px_rgba(255,255,255,0.07)]"
             >
               <div className="flex items-start gap-3">
                 <span className={cn(
-                  "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums",
+                  "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tabular-nums",
                   isAccepted ? "bg-emerald-400/15 text-emerald-200" : isRejected ? "bg-zinc-700 text-zinc-400" : "bg-[#f7ca58] text-[#1b1205]",
                 )}>
                   {isAccepted ? <Check className="size-3.5" /> : changeSuggestions.findIndex((candidate) => candidate.id === suggestion.id) + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium leading-5 text-zinc-100">{suggestion.title}</p>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">{suggestion.summary}</p>
+                  <p className="text-sm font-medium leading-5 text-zinc-100 text-pretty">{suggestion.title}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500 text-pretty">{suggestion.summary}</p>
                   <p className="mt-2 text-[11px] text-zinc-600">{suggestion.impact} · {suggestion.status}</p>
                 </div>
               </div>
@@ -180,7 +188,7 @@ export function WorkspaceChat({
         {auditError ? <p role="alert" className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">{auditError}</p> : null}
       </div>
 
-      <div className="p-3">
+      <div className="p-2.5">
         <div className="mb-2 min-h-7">
           {selectedElements.length ? (
             <div className="flex max-w-full items-center gap-1.5 overflow-hidden">
@@ -227,7 +235,7 @@ export function WorkspaceChat({
           )}
         </div>
         {activeSelection ? (
-          <div className="mb-2 rounded-xl bg-white/[0.035] p-2">
+          <div className="mb-2 rounded-2xl bg-white/[0.035] p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
             <div className="mb-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-zinc-500">
               <span className="truncate">
                 Note for <span className="font-mono tabular-nums text-[#f7ca58]">#{activeSelectionNumber}</span> {elementLabel(activeSelection)}
@@ -242,7 +250,7 @@ export function WorkspaceChat({
             />
           </div>
         ) : null}
-        <div className="rounded-xl bg-black/20 p-2">
+        <div className="rounded-2xl bg-[#171715] p-2 shadow-[0_12px_36px_rgba(0,0,0,0.2),inset_0_0_0_1px_rgba(255,255,255,0.06)]">
           <Textarea
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}

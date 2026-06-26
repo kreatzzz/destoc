@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/auth";
 import { withRouteErrorHandling } from "@/lib/errors";
 import { acceptSuggestion } from "@/server/revisions";
-import { executeSandboxRun } from "@/server/sandbox-executor";
+import { applyPatchToExistingSandboxRun } from "@/server/sandbox-executor";
 
 export const runtime = "nodejs";
 
@@ -15,14 +15,13 @@ export async function POST(_request: Request, { params }: RouteContext) {
     const revision = await acceptSuggestion(user.id, suggestionId);
 
     if (revision.sandboxRunId) {
-      void executeSandboxRun(user.id, {
+      const sandboxRun = await applyPatchToExistingSandboxRun(user.id, {
         sandboxRunId: revision.sandboxRunId,
         projectId: revision.projectId,
         patch: revision.patch,
         revisionId: revision.id,
-      }).catch((error: unknown) => {
-        console.error("Revision sandbox execution failed after accepting suggestion", error);
       });
+      return NextResponse.json({ revision: { ...revision, sandboxRun } }, { status: 201 });
     }
 
     return NextResponse.json({ revision }, { status: 201 });

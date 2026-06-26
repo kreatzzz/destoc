@@ -1,6 +1,8 @@
 import { Sandbox } from "@vercel/sandbox";
+import { getPrisma } from "@/lib/db";
 import { AppError, asAppError } from "@/lib/errors";
 import { requireProjectOwnership } from "@/server/authorization";
+import { normalizeUnifiedDiff } from "@/server/patches";
 import { createPreviewBridgeProxyScript } from "@/server/preview-bridge";
 import { getSandboxCredentials } from "@/server/sandbox-credentials";
 import { transitionSandboxRun, updateSandboxRunProgress } from "@/server/sandbox-runs";
@@ -169,12 +171,6 @@ async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
   return proxy.url;
 }
 
-function normalizePatchInput(patch: string): string {
-  const trimmed = patch.trim();
-  const fenced = trimmed.match(/^```(?:diff|patch)?\s*\n([\s\S]*?)\n```$/i);
-  return `${(fenced?.[1] ?? trimmed).replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd()}\n`;
-}
-
 function createExactPatchFallbackScript() {
   return String.raw`
 const fs = require("node:fs");
@@ -235,7 +231,7 @@ process.stdout.write("Fallback exact-block patch applied to " + new Set(hunks.ma
 
 async function applyPatchToSandbox(sandbox: Sandbox, patch: string): Promise<string> {
   const patchPath = `${sandbox.cwd}/.destoc.patch`;
-  await sandbox.fs.writeFile(patchPath, normalizePatchInput(patch), "utf8");
+  await sandbox.fs.writeFile(patchPath, normalizeUnifiedDiff(patch), "utf8");
 
   const apply = await sandbox.runCommand({
     cmd: "git",
@@ -334,10 +330,10 @@ export async function executeSandboxRun(
       );
     }
 
-    if (nextProject && (!scripts.build || !scripts.start)) {
+    if (nextProject && !scripts.dev && (!scripts.build || !scripts.start)) {
       throw new AppError(
         "VALIDATION_ERROR",
-        "This Next.js repository needs both npm run build and npm run start scripts for a production sandbox preview.",
+        "This Next.js repository needs npm run dev, or both npm run build and npm run start, for a sandbox preview.",
       );
     }
 
@@ -376,7 +372,7 @@ export async function executeSandboxRun(
       });
     }
 
-    if (nextProject) {
+    if (nextProject && !scripts.dev) {
       logs = appendLog(logs, "Building production preview.");
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
       const build = await sandbox.runCommand({
@@ -406,7 +402,7 @@ export async function executeSandboxRun(
       cmd: "sh",
       args: [
         "-lc",
-        nextProject
+        nextProject && !scripts.dev
           ? `exec npm run start -- -H 0.0.0.0 -p 3000 > ${PREVIEW_LOG_FILE} 2>&1`
           : scripts.dev
             ? `exec npm run dev -- --hostname 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`
@@ -481,6 +477,58 @@ export async function executeSandboxRun(
       });
     }
 
+    throw error;
+  }
+}
+
+export async function applyPatchToExistingSandboxRun(
+  userId: string,
+  input: { projectId: string; sandboxRunId: string; revisionId: string; patch: string },
+) {
+  await requireProjectOwnership(input.projectId, userId);
+  const run = await getPrisma().sandboxRun.findFirst({
+    where: {
+      id: input.sandboxRunId,
+      projectId: input.projectId,
+      project: { workspace: { userId } },
+    },
+  });
+  if (!run) throw new AppError("NOT_FOUND", "Sandbox run not found.");
+  if (run.status !== "READY" || !run.previewUrl) {
+    throw new AppError("CONFLICT", "Start a live sandbox preview before accepting this patch.");
+  }
+
+  const credentials = getSandboxCredentials();
+  await transitionRevision(userId, input.revisionId, "APPLYING");
+  let logs = appendLog(run.logs ?? "", "Applying accepted patch to the running sandbox.");
+
+  try {
+    const sandbox = await Sandbox.get({
+      ...credentials,
+      name: `destoc-${input.sandboxRunId}`,
+      resume: false,
+    });
+    const patchLog = await applyPatchToSandbox(sandbox, input.patch);
+    logs = appendLog(logs, `Patch apply result:\n${patchLog}`);
+    await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+    await transitionRevision(userId, input.revisionId, "READY");
+    return getPrisma().sandboxRun.findUniqueOrThrow({ where: { id: input.sandboxRunId } });
+  } catch (error) {
+    const appError = asAppError(error);
+    logs = appendLog(logs, `Failure details:\n${String(appError.cause ?? appError.message)}`);
+    await updateSandboxRunProgress(userId, input.sandboxRunId, {
+      logs,
+      errorCode: appError.code,
+      errorMessage: appError.expose ? appError.message : "Patch application failed.",
+    }).catch((updateError: unknown) => {
+      console.error("Failed to persist patch-application failure", updateError);
+    });
+    await transitionRevision(userId, input.revisionId, "FAILED", {
+      errorCode: appError.code,
+      errorMessage: appError.expose ? appError.message : "Patch application failed.",
+    }).catch((transitionError: unknown) => {
+      console.error("Failed to persist revision failure", transitionError);
+    });
     throw error;
   }
 }

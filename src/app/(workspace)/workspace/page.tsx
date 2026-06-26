@@ -1,12 +1,10 @@
-import Link from "next/link";
-
 import { DestocLogo } from "@/components/app-shell/destoc-logo";
 import { AnimatedArrowRightIcon, AnimatedPlusIcon } from "@/components/ui/animated-icons";
 import { ProjectImportForm } from "@/components/workspace/project-import-form";
 import { ProjectList, type WorkspaceProjectListItem } from "@/components/workspace/project-list";
 import { WorkspaceOnboarding } from "@/components/workspace/workspace-onboarding";
+import { WorkspaceLogoutButton } from "@/components/workspace/workspace-logout-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { listProjects, listWorkspaces } from "@/server";
 
@@ -40,9 +38,7 @@ export default async function WorkspacePage() {
               <h1 className="mt-1 text-xl font-semibold tracking-[-0.04em] text-zinc-50">Repository control</h1>
             </div>
           </div>
-          <Button asChild variant="ghost" className="text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100">
-            <Link href="/">Back to start</Link>
-          </Button>
+          <WorkspaceLogoutButton />
         </header>
 
         {!activeWorkspace ? <WorkspaceOnboarding /> : (

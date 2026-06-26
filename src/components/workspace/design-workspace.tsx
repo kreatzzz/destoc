@@ -141,6 +141,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const router = useRouter();
   const [designMode, setDesignMode] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(data.preview?.url);
+  const [previewReloadKey, setPreviewReloadKey] = useState(0);
   const [sandboxRunId, setSandboxRunId] = useState(data.preview?.runId);
   const [previewStatus, setPreviewStatus] = useState<WorkspacePreview["status"]>(data.preview?.status);
   const [previewLogs, setPreviewLogs] = useState("");
@@ -160,7 +161,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const [isAuditPending, setIsAuditPending] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [pendingSuggestionId, setPendingSuggestionId] = useState<string | null>(null);
-  const [codePaneOpen, setCodePaneOpen] = useState(data.suggestions.some((suggestion) => suggestion.patch?.trim()));
+  const [codePaneOpen, setCodePaneOpen] = useState(false);
   const [chatWidth, setChatWidth] = useState(defaultChatWidth);
   const [codePaneWidth, setCodePaneWidth] = useState(defaultCodePaneWidth);
   const [isStoppingPreview, setIsStoppingPreview] = useState(false);
@@ -426,7 +427,6 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       const nextSuggestions = reviewPayload?.review?.suggestions?.map(mapReviewSuggestion) ?? [];
       setSuggestions(nextSuggestions);
       const hasPatch = nextSuggestions.some((suggestion) => suggestion.patch?.trim());
-      setCodePaneOpen(hasPatch);
       setMessages((current) => [...current, {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -459,20 +459,16 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       setMessages((current) => [...current, {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: "Accepted. I’m applying it in a fresh preview now.",
+        content: "Accepted. I’m applying it to the live preview now.",
       }]);
       if (payload?.revision?.sandboxRun) {
-        setPreviewUrl(undefined);
         applyRunState(payload.revision.sandboxRun);
-        void pollSandboxRun(payload.revision.sandboxRun.id).then((ready) => {
-          if (ready) {
-            setMessages((current) => [...current, {
-              id: crypto.randomUUID(),
-              role: "assistant",
-              content: "Patched preview is live.",
-            }]);
-          }
-        });
+        window.setTimeout(() => setPreviewReloadKey((key) => key + 1), 450);
+        setMessages((current) => [...current, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "Patch applied. Reloading the preview.",
+        }]);
       }
       router.refresh();
     } catch (error) {
@@ -558,6 +554,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
         <CanvasPreview
           designMode={designMode}
           previewUrl={previewUrl}
+          previewReloadKey={previewReloadKey}
           selectedElements={selectedElements}
           previewStatusText={previewStatusText}
           previewError={previewError}

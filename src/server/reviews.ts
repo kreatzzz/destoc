@@ -9,9 +9,9 @@ import {
   type CreateReviewTargetInput,
 } from "@/lib/schemas";
 import { requireProjectOwnership } from "@/server/authorization";
-import { assertPatchIsAllowed } from "@/server/patches";
+import { assertPatchIsAllowed, normalizeUnifiedDiff } from "@/server/patches";
 import { enforceRateLimit } from "@/server/rate-limit";
-import { inferSimpleTextReplacementPatch, sourceContextForReview } from "@/server/source-context";
+import { inferSimpleTextReplacementPatches, sourceContextForReview } from "@/server/source-context";
 
 export async function createReviewTarget(userId: string, input: CreateReviewTargetInput | unknown) {
   await enforceRateLimit("mutation", userId);
@@ -112,32 +112,45 @@ export async function runReview(userId: string, input: CreateReviewInput | unkno
           : undefined,
       },
     });
-    const inferredPatch = result.suggestions.some((suggestion) => suggestion.patch?.trim())
-      ? null
-      : inferSimpleTextReplacementPatch(sourceContext, target);
+    const inferredPatches = inferSimpleTextReplacementPatches(sourceContext, target);
 
-    if (inferredPatch) {
-      result.suggestions = [
-        {
-          severity: "low",
-          confidence: 0.95,
-          title: inferredPatch.title,
-          issue: inferredPatch.issue,
-          rationale: "This is a direct selected-text replacement found in the fetched source context.",
-          intendedOutcome: inferredPatch.intendedOutcome,
-          patch: inferredPatch.patch,
+    if (inferredPatches.length) {
+      result.suggestions = inferredPatches.map((inferredPatch) => ({
+        severity: "low",
+        confidence: 0.95,
+        title: inferredPatch.title,
+        issue: inferredPatch.issue,
+        rationale: "This is a direct selected-text replacement found in the fetched source context.",
+        intendedOutcome: inferredPatch.intendedOutcome,
+        patch: inferredPatch.patch,
+        verificationChecklist: [
+          "Confirm the selected text changed in the preview.",
+          "Confirm spacing and link behavior remain unchanged.",
+        ],
+      }));
+      result.summary = inferredPatches.length === 1
+        ? "I drafted a direct source diff for the selected text change."
+        : `I drafted ${inferredPatches.length} direct source diffs for the selected text changes.`;
+    }
+
+    result.suggestions = result.suggestions.map((suggestion) => {
+      if (!suggestion.patch?.trim()) return suggestion;
+      try {
+        const normalizedPatch = normalizeUnifiedDiff(suggestion.patch);
+        assertPatchIsAllowed(normalizedPatch, target.sourceFilePath ?? undefined);
+        return { ...suggestion, patch: normalizedPatch };
+      } catch {
+        return {
+          ...suggestion,
+          patch: undefined,
+          rationale: `${suggestion.rationale} Destoc did not attach a patch because the generated diff was not valid unified-diff syntax.`,
           verificationChecklist: [
-            "Confirm the selected text changed in the preview.",
-            "Confirm spacing and link behavior remain unchanged.",
-          ],
-        },
-      ];
-      result.summary = "I drafted a direct source diff for the selected text change.";
-    }
-
-    for (const suggestion of result.suggestions) {
-      if (suggestion.patch) assertPatchIsAllowed(suggestion.patch, target.sourceFilePath ?? undefined);
-    }
+            ...suggestion.verificationChecklist,
+            "Select the component again and add a direct note if you want Destoc to generate a safe patch.",
+          ].slice(0, 10),
+        };
+      }
+    });
 
     return await getPrisma().$transaction(async (transaction) => {
       await transaction.suggestion.createMany({

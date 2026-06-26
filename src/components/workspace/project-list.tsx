@@ -1,23 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
 
-import { AnimatedArrowUpRightIcon, AnimatedDeleteIcon, AnimatedFolderOpenIcon } from "@/components/ui/animated-icons";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { AnimatedArrowUpRightIcon, AnimatedFolderOpenIcon } from "@/components/ui/animated-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -57,38 +42,8 @@ function statusClassName(status: WorkspaceProjectListItem["previewStatus"]) {
 }
 
 export function ProjectList({ projects }: ProjectListProps) {
-  const router = useRouter();
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  async function deleteProject(projectId: string) {
-    setDeletingId(projectId);
-    setDeleteError(null);
-
-    try {
-      const response = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
-      const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-
-      if (!response.ok) {
-        throw new Error(payload?.error?.message ?? "Project could not be deleted.");
-      }
-
-      router.refresh();
-    } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : "Project could not be deleted.");
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
   return (
     <section className="grid content-start gap-3">
-      {deleteError ? (
-        <p role="alert" className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-          {deleteError}
-        </p>
-      ) : null}
-
       {projects.map((project) => (
         <article
           key={project.id}
@@ -127,47 +82,6 @@ export function ProjectList({ projects }: ProjectListProps) {
               </TooltipTrigger>
               <TooltipContent>Open project</TooltipContent>
             </Tooltip>
-
-            <AlertDialog>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Delete ${project.name}`}
-                      disabled={deletingId === project.id}
-                      className="text-zinc-500 hover:bg-rose-500/10 hover:text-rose-200"
-                    >
-                      {deletingId === project.id ? <Loader2 className="animate-spin" /> : <AnimatedDeleteIcon size={14} />}
-                    </Button>
-                  </AlertDialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Delete project</TooltipContent>
-              </Tooltip>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogMedia className="bg-rose-500/10 text-rose-300">
-                    <AnimatedDeleteIcon size={22} />
-                  </AlertDialogMedia>
-                  <AlertDialogTitle>Delete this project?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This removes {project.repository} from Destoc, including saved reviews, selections, and revisions.
-                    The GitHub repository itself is not changed.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={deletingId === project.id}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    variant="destructive"
-                    disabled={deletingId === project.id}
-                    onClick={() => void deleteProject(project.id)}
-                  >
-                    {deletingId === project.id ? "Deleting…" : "Delete project"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
           </div>
         </article>
       ))}

@@ -9,6 +9,42 @@ import {
 import { requireProjectOwnership, requireWorkspaceOwnership } from "@/server/authorization";
 import { enforceRateLimit } from "@/server/rate-limit";
 
+async function verifyPublicGitHubRepository(owner: string, repository: string, branch: string) {
+  const repoResponse = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}`, {
+    headers: { accept: "application/vnd.github+json", "user-agent": "destoc-repository-import" },
+    signal: AbortSignal.timeout(8_000),
+  }).catch(() => null);
+
+  if (!repoResponse) {
+    throw new AppError("VALIDATION_ERROR", "Could not reach GitHub to verify this repository. Try again in a moment.");
+  }
+
+  if (repoResponse.status === 404) {
+    throw new AppError("VALIDATION_ERROR", "That public GitHub repository was not found. Check the owner, repository name, and visibility.");
+  }
+
+  if (!repoResponse.ok) {
+    throw new AppError("VALIDATION_ERROR", `GitHub could not verify this repository right now (HTTP ${repoResponse.status}).`);
+  }
+
+  const branchResponse = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/branches/${encodeURIComponent(branch)}`, {
+    headers: { accept: "application/vnd.github+json", "user-agent": "destoc-repository-import" },
+    signal: AbortSignal.timeout(8_000),
+  }).catch(() => null);
+
+  if (!branchResponse) {
+    throw new AppError("VALIDATION_ERROR", "Could not verify the repository branch. Try again in a moment.");
+  }
+
+  if (branchResponse.status === 404) {
+    throw new AppError("VALIDATION_ERROR", `The branch “${branch}” was not found in this repository.`);
+  }
+
+  if (!branchResponse.ok) {
+    throw new AppError("VALIDATION_ERROR", `GitHub could not verify this branch right now (HTTP ${branchResponse.status}).`);
+  }
+}
+
 export async function createWorkspace(userId: string, input: unknown) {
   await enforceRateLimit("mutation", userId);
   const { name } = createWorkspaceSchema.parse(input);
@@ -32,6 +68,7 @@ export async function createProject(userId: string, input: CreateProjectInput | 
   await enforceRateLimit("mutation", userId);
   const parsed = createProjectSchema.parse(input);
   await requireWorkspaceOwnership(parsed.workspaceId, userId);
+  await verifyPublicGitHubRepository(parsed.githubUrl.owner, parsed.githubUrl.repository, parsed.defaultBranch);
 
   try {
     return await getPrisma().project.create({

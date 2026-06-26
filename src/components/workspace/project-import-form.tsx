@@ -19,7 +19,7 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
   }, [router, state.ok, state.projectId]);
 
   return (
-    <form action={action} className="grid gap-4 text-zinc-100">
+    <form action={action} className="grid gap-4 text-zinc-100" noValidate>
       <input type="hidden" name="workspaceId" value={workspaceId} />
       <div>
         <p className="text-sm font-medium">Import a public repository</p>
@@ -30,9 +30,11 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
         <Input
           id="github-url"
           name="githubUrl"
-          type="url"
+          type="text"
+          inputMode="url"
           placeholder="https://github.com/owner/repository"
           required
+          aria-invalid={state.ok === false && Boolean(state.message)}
           className="border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
         />
       </div>
@@ -46,7 +48,11 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
           className="border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
         />
       </div>
-      {state.message ? <p role="alert" className="text-sm text-rose-300">{state.message}</p> : null}
+      {state.message ? (
+        <p role="alert" className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm leading-5 text-rose-200">
+          {state.message}
+        </p>
+      ) : null}
       {state.ok ? <p role="status" className="text-sm text-[#f7ca58]">Repository imported. Opening workspace…</p> : null}
       <Button type="submit" disabled={isPending} className="bg-[#f7ca58] text-[#1b1205] hover:bg-[#ffd879]">
         {isPending ? "Importing…" : "Import repository"}

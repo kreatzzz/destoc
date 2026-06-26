@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { AppError } from "@/lib/errors";
-import { assertPatchIsAllowed } from "@/server/patches";
+import { assertPatchIsAllowed, normalizeUnifiedDiff } from "@/server/patches";
 
 const validPatch = [
   "--- a/src/components/Hero.tsx",
@@ -25,5 +25,24 @@ describe("assertPatchIsAllowed", () => {
     expect(() => assertPatchIsAllowed(validPatch, "src/components/Other.tsx")).toThrow(
       "selected source file",
     );
+  });
+
+  it("normalizes fenced patch output before validation", () => {
+    const fencedPatch = `\`\`\`diff\n${validPatch}\n\`\`\``;
+    expect(normalizeUnifiedDiff(fencedPatch)).toBe(`${validPatch}\n`);
+    expect(() => assertPatchIsAllowed(fencedPatch, "src/components/Hero.tsx")).not.toThrow();
+  });
+
+  it("rejects malformed hunks before they reach sandbox apply", () => {
+    const corruptPatch = [
+      "--- a/src/components/Hero.tsx",
+      "+++ b/src/components/Hero.tsx",
+      "@@",
+      "-const label = \"Recent works\";",
+      "const missingPrefix = true;",
+      "+const label = \"Recent projects\";",
+    ].join("\n");
+
+    expect(() => assertPatchIsAllowed(corruptPatch)).toThrow("unprefixed source line");
   });
 });
