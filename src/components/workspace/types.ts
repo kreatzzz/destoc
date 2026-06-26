@@ -36,6 +36,7 @@ export interface WorkspacePreview {
 }
 
 export interface WorkspaceSelectedElement {
+  id: string;
   selector: string;
   role: string | null;
   text: string;

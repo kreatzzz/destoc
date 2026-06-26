@@ -96,6 +96,15 @@ function selectedElementLabel(element: WorkspaceSelectedElement) {
   return element.selector.split(">").at(-1)?.trim() ?? element.selector;
 }
 
+function selectedElementIdentity(element: WorkspaceSelectedElement) {
+  return [
+    element.selector,
+    element.role ?? "",
+    element.text?.trim() ?? "",
+    element.domPath.join(">"),
+  ].join("|");
+}
+
 function selectedElementNotesForPrompt(elements: WorkspaceSelectedElement[]) {
   return elements
     .map((element, index) => {
@@ -139,7 +148,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const [isPreviewStarting, setIsPreviewStarting] = useState(activeSandboxStatuses.has(data.preview?.status));
   const [selectedElements, setSelectedElements] = useState<WorkspaceSelectedElement[]>([]);
   const [suggestions, setSuggestions] = useState<WorkspaceSuggestion[]>(data.suggestions);
-  const [activeSelectionSelector, setActiveSelectionSelector] = useState<string | null>(null);
+  const [activeSelectionId, setActiveSelectionId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<WorkspaceChatMessage[]>([
     {
@@ -318,32 +327,37 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
   function addSelectedElement(selection: WorkspaceSelectedElement) {
     setSelectedElements((current) => {
-      if (current.some((element) => element.selector === selection.selector)) return current;
-      return [...current, selection];
+      const nextSelection = { ...selection, id: selection.id || crypto.randomUUID() };
+      const existing = current.find((element) => selectedElementIdentity(element) === selectedElementIdentity(nextSelection));
+      if (existing) {
+        setActiveSelectionId(existing.id);
+        return current;
+      }
+      setActiveSelectionId(nextSelection.id);
+      return [...current, nextSelection];
     });
-    setActiveSelectionSelector(selection.selector);
   }
 
-  function removeSelectedElement(selector: string) {
+  function removeSelectedElement(selectionId: string) {
     setSelectedElements((current) => {
-      const nextElements = current.filter((element) => element.selector !== selector);
-      if (activeSelectionSelector === selector) {
-        setActiveSelectionSelector(nextElements.at(-1)?.selector ?? null);
+      const nextElements = current.filter((element) => element.id !== selectionId);
+      if (activeSelectionId === selectionId) {
+        setActiveSelectionId(nextElements.at(-1)?.id ?? null);
       }
       return nextElements;
     });
   }
 
-  function updateSelectedElementNote(selector: string, note: string) {
+  function updateSelectedElementNote(selectionId: string, note: string) {
     setSelectedElements((current) => current.map((element) => (
-      element.selector === selector ? { ...element, note } : element
+      element.id === selectionId ? { ...element, note } : element
     )));
   }
 
   async function sendPrompt() {
     const trimmedPrompt = prompt.trim();
     const selectedElementsSnapshot = selectedElements;
-    const activeSelectionSelectorSnapshot = activeSelectionSelector;
+    const activeSelectionIdSnapshot = activeSelectionId;
     const selectedElementNotes = selectedElementNotesForPrompt(selectedElementsSnapshot);
     const reviewPrompt = buildReviewPrompt(trimmedPrompt, selectedElementNotes);
     if (!reviewPrompt || isAuditPending) return;
@@ -352,7 +366,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     setAuditError(null);
     setIsAuditPending(true);
     setSelectedElements([]);
-    setActiveSelectionSelector(null);
+    setActiveSelectionId(null);
     const messageId = crypto.randomUUID();
     setMessages((current) => [
       ...current,
@@ -365,7 +379,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
     try {
       if (!previewUrl) throw new Error("Preview is still starting. Try again when it is live.");
-      const focusedElement = selectedElementsSnapshot.find((element) => element.selector === activeSelectionSelectorSnapshot)
+      const focusedElement = selectedElementsSnapshot.find((element) => element.id === activeSelectionIdSnapshot)
         ?? selectedElementsSnapshot.at(-1)
         ?? null;
       const targetResponse = await fetch("/api/reviews/targets", {
@@ -526,7 +540,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           width={chatWidth}
           onWidthChange={setChatWidth}
           selectedElements={selectedElements}
-          activeSelectionSelector={activeSelectionSelector}
+          activeSelectionId={activeSelectionId}
           messages={messages}
           suggestions={suggestions}
           prompt={prompt}
@@ -538,7 +552,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           onAcceptSuggestion={(suggestionId) => void acceptSuggestion(suggestionId)}
           onRejectSuggestion={(suggestionId) => void rejectSuggestion(suggestionId)}
           onRemoveSelection={removeSelectedElement}
-          onActiveSelectionChange={setActiveSelectionSelector}
+          onActiveSelectionChange={setActiveSelectionId}
           onSelectionNoteChange={updateSelectedElementNote}
         />
         <CanvasPreview

@@ -49,6 +49,7 @@ All notable project decisions and changes are recorded here.
 - Added Coolify-friendly Docker deployment support with standalone Next.js output, startup Prisma migrations, a container health endpoint, `.dockerignore`, and a deployment runbook.
 - Production rate limiting now supports an explicit single-instance home-server fallback via `ALLOW_IN_MEMORY_RATE_LIMIT`; Upstash remains the recommended distributed limiter.
 - Suggestion decisions now live in compact chat cards while the code pane shows only diffs; accepting a suggestion applies its patch in a fresh sandbox run and automatically switches the preview when ready.
+- Accepted patches now tolerate fenced/malformed provider diffs with `git apply --recount` plus an exact-block fallback, and multi-component selections now use stable local IDs for pills, notes, and removal.
 
 ### Deferred
 

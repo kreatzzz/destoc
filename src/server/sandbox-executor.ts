@@ -169,37 +169,111 @@ async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
   return proxy.url;
 }
 
+function normalizePatchInput(patch: string): string {
+  const trimmed = patch.trim();
+  const fenced = trimmed.match(/^```(?:diff|patch)?\s*\n([\s\S]*?)\n```$/i);
+  return `${(fenced?.[1] ?? trimmed).replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd()}\n`;
+}
+
+function createExactPatchFallbackScript() {
+  return String.raw`
+const fs = require("node:fs");
+const path = require("node:path");
+
+const patch = fs.readFileSync(process.argv[2], "utf8");
+const lines = patch.split(/\n/);
+const hunks = [];
+let currentFile = null;
+let currentHunk = null;
+
+function finishHunk() {
+  if (currentHunk) {
+    if (currentHunk.oldLines.length === 0) throw new Error("fallback requires at least one removed line");
+    hunks.push(currentHunk);
+  }
+  currentHunk = null;
+}
+
+for (const line of lines) {
+  if (line.startsWith("+++ b/")) {
+    currentFile = line.slice("+++ b/".length).trim();
+    continue;
+  }
+  if (line.startsWith("@@")) {
+    finishHunk();
+    if (!currentFile) throw new Error("fallback hunk is missing a target file");
+    currentHunk = { file: currentFile, oldLines: [], newLines: [] };
+    continue;
+  }
+  if (!currentHunk) continue;
+  if (line.startsWith("--- ") || line.startsWith("+++ ")) continue;
+  if (line.startsWith("-")) currentHunk.oldLines.push(line.slice(1));
+  else if (line.startsWith("+")) currentHunk.newLines.push(line.slice(1));
+  else if (line.startsWith(" ")) {
+    currentHunk.oldLines.push(line.slice(1));
+    currentHunk.newLines.push(line.slice(1));
+  }
+}
+finishHunk();
+
+if (hunks.length === 0) throw new Error("fallback found no hunks");
+
+for (const hunk of hunks) {
+  if (path.isAbsolute(hunk.file) || hunk.file.includes("..")) throw new Error("unsafe fallback path: " + hunk.file);
+  const oldBlock = hunk.oldLines.join("\n");
+  const newBlock = hunk.newLines.join("\n");
+  const filePath = path.join(process.cwd(), hunk.file);
+  const source = fs.readFileSync(filePath, "utf8");
+  const index = source.indexOf(oldBlock);
+  if (index === -1) throw new Error("fallback could not find exact removed block in " + hunk.file);
+  fs.writeFileSync(filePath, source.slice(0, index) + newBlock + source.slice(index + oldBlock.length));
+}
+
+process.stdout.write("Fallback exact-block patch applied to " + new Set(hunks.map((hunk) => hunk.file)).size + " file(s).\n");
+`;
+}
+
 async function applyPatchToSandbox(sandbox: Sandbox, patch: string): Promise<string> {
   const patchPath = `${sandbox.cwd}/.destoc.patch`;
-  await sandbox.fs.writeFile(patchPath, patch, "utf8");
+  await sandbox.fs.writeFile(patchPath, normalizePatchInput(patch), "utf8");
 
   const apply = await sandbox.runCommand({
     cmd: "git",
-    args: ["apply", "--check", patchPath],
+    args: ["apply", "--check", "--recount", "--unidiff-zero", patchPath],
     cwd: sandbox.cwd,
     timeoutMs: 15_000,
   });
   const checkLog = await commandLog(apply);
-  if (apply.exitCode !== 0) {
-    throw new AppError("VALIDATION_ERROR", "Accepted patch could not be applied cleanly.", {
-      cause: checkLog,
+
+  if (apply.exitCode === 0) {
+    const commit = await sandbox.runCommand({
+      cmd: "git",
+      args: ["apply", "--recount", "--unidiff-zero", patchPath],
+      cwd: sandbox.cwd,
+      timeoutMs: 15_000,
     });
+    const applyLog = await commandLog(commit);
+    if (commit.exitCode === 0) {
+      return truncateLog([checkLog, applyLog].filter(Boolean).join("\n") || "Patch applied cleanly.");
+    }
   }
 
-  const commit = await sandbox.runCommand({
-    cmd: "git",
-    args: ["apply", patchPath],
+  const fallbackPath = `${sandbox.cwd}/.destoc-apply-fallback.cjs`;
+  await sandbox.fs.writeFile(fallbackPath, createExactPatchFallbackScript(), "utf8");
+  const fallback = await sandbox.runCommand({
+    cmd: "node",
+    args: [fallbackPath, patchPath],
     cwd: sandbox.cwd,
     timeoutMs: 15_000,
   });
-  const applyLog = await commandLog(commit);
-  if (commit.exitCode !== 0) {
-    throw new AppError("VALIDATION_ERROR", "Accepted patch failed while applying.", {
-      cause: applyLog,
+  const fallbackLog = await commandLog(fallback);
+  if (fallback.exitCode !== 0) {
+    throw new AppError("VALIDATION_ERROR", "Accepted patch could not be applied cleanly.", {
+      cause: truncateLog(`git apply:\n${checkLog}\nExact fallback:\n${fallbackLog}`),
     });
   }
 
-  return truncateLog([checkLog, applyLog].filter(Boolean).join("\n") || "Patch applied cleanly.");
+  return truncateLog(`git apply needed fallback:\n${checkLog}\n${fallbackLog}`);
 }
 
 /**
@@ -370,6 +444,9 @@ export async function executeSandboxRun(
     const appError = asAppError(error);
     const errorCode = appError.code === "INTERNAL_ERROR" ? "SANDBOX_EXECUTION_FAILED" : appError.code;
     const errorMessage = appError.expose ? appError.message : "Sandbox execution failed.";
+    if (appError.cause) {
+      logs = appendLog(logs, `Failure details:\n${String(appError.cause)}`);
+    }
 
     if (sandbox && !logs.includes("Preview startup log:")) {
       logs = appendLog(logs, `Preview startup log:\n${await readPreviewLog(sandbox)}`);

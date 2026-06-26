@@ -72,6 +72,7 @@ export function CanvasPreview({
         source: "destoc-workspace",
         type: "DESTOC_SELECTED_ELEMENTS",
         payload: selectedElements.map((element, index) => ({
+          id: element.id,
           selector: element.selector,
           index,
           label: element.role ?? element.text?.slice(0, 48) ?? element.selector,

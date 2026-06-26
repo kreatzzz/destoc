@@ -14,7 +14,7 @@ interface WorkspaceChatProps {
   width: number;
   onWidthChange: (width: number) => void;
   selectedElements: WorkspaceSelectedElement[];
-  activeSelectionSelector: string | null;
+  activeSelectionId: string | null;
   messages: WorkspaceChatMessage[];
   suggestions: WorkspaceSuggestion[];
   prompt: string;
@@ -25,9 +25,9 @@ interface WorkspaceChatProps {
   onSendPrompt: () => void;
   onAcceptSuggestion: (suggestionId: string) => void;
   onRejectSuggestion: (suggestionId: string) => void;
-  onRemoveSelection: (selector: string) => void;
-  onActiveSelectionChange: (selector: string) => void;
-  onSelectionNoteChange: (selector: string, note: string) => void;
+  onRemoveSelection: (selectionId: string) => void;
+  onActiveSelectionChange: (selectionId: string) => void;
+  onSelectionNoteChange: (selectionId: string, note: string) => void;
 }
 
 function elementLabel(element: WorkspaceSelectedElement) {
@@ -49,7 +49,7 @@ export function WorkspaceChat({
   width,
   onWidthChange,
   selectedElements,
-  activeSelectionSelector,
+  activeSelectionId,
   messages,
   suggestions,
   prompt,
@@ -68,11 +68,11 @@ export function WorkspaceChat({
   const canSend = (prompt.trim().length > 0 || hasSelectedElementNotes) && !isAuditPending;
   const visibleSelections = selectedElements.slice(-visibleSelectionLimit);
   const hiddenSelectionCount = Math.max(0, selectedElements.length - visibleSelections.length);
-  const activeSelection = selectedElements.find((element) => element.selector === activeSelectionSelector)
+  const activeSelection = selectedElements.find((element) => element.id === activeSelectionId)
     ?? selectedElements.at(-1)
     ?? null;
   const activeSelectionNumber = activeSelection
-    ? selectedElements.findIndex((element) => element.selector === activeSelection.selector) + 1
+    ? selectedElements.findIndex((element) => element.id === activeSelection.id) + 1
     : 0;
   const changeSuggestions = suggestions.filter((suggestion) => suggestion.patch?.trim());
 
@@ -186,20 +186,20 @@ export function WorkspaceChat({
             <div className="flex max-w-full items-center gap-1.5 overflow-hidden">
               {visibleSelections.map((element) => (
                 <span
-                  key={element.selector}
+                  key={element.id}
                   className={cn(
                     "group inline-flex min-w-0 max-w-[112px] items-center justify-center gap-1.5 rounded-full px-1 py-1 text-center text-[11px] transition-[background-color,color,box-shadow] duration-150",
-                    activeSelection?.selector === element.selector
+                    activeSelection?.id === element.id
                       ? "bg-[#f7ca58] text-[#1b1205] shadow-[0_0_18px_rgba(247,202,88,0.14)]"
                       : "bg-[#f7ca58]/10 text-[#ffd879] hover:bg-[#f7ca58]/15",
                   )}
                 >
                   <button
                     type="button"
-                    onClick={() => onActiveSelectionChange(element.selector)}
+                    onClick={() => onActiveSelectionChange(element.id)}
                     className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 px-1.5 text-current"
                   >
-                    <span className="shrink-0 font-mono font-semibold tabular-nums">{selectedElements.findIndex((candidate) => candidate.selector === element.selector) + 1}</span>
+                    <span className="shrink-0 font-mono font-semibold tabular-nums">{selectedElements.findIndex((candidate) => candidate.id === element.id) + 1}</span>
                     <span className="min-w-0 truncate">{elementLabel(element)}</span>
                   </button>
                   {element.note?.trim() ? <span className="size-1 shrink-0 rounded-full bg-current opacity-70" /> : null}
@@ -208,7 +208,7 @@ export function WorkspaceChat({
                     aria-label={`Remove ${elementLabel(element)}`}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onRemoveSelection(element.selector);
+                      onRemoveSelection(element.id);
                     }}
                     className="inline-flex size-3.5 shrink-0 items-center justify-center text-current/60 transition-colors hover:text-current"
                   >
@@ -236,7 +236,7 @@ export function WorkspaceChat({
             </div>
             <Textarea
               value={activeSelection.note ?? ""}
-              onChange={(event) => onSelectionNoteChange(activeSelection.selector, event.target.value)}
+              onChange={(event) => onSelectionNoteChange(activeSelection.id, event.target.value)}
               placeholder="Add what should change or what to review here…"
               className="max-h-24 min-h-16 resize-none border-0 bg-transparent px-2 py-2 text-xs leading-5 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
             />
