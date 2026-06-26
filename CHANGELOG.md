@@ -38,6 +38,7 @@ All notable project decisions and changes are recorded here.
 - The workspace logo now renders as a minimal yellow wordmark without a containing badge.
 - The workspace index now uses a denser project dashboard with status summaries, polished import surfaces, and icon-only project deletion.
 - The workspace index hero now removes the workspace-name eyebrow and boxy rounded/overflow card treatment per design feedback.
+- The workspace index now uses a minimal colored/padded project count strip and removes extra explanatory copy.
 
 ### Deferred
 

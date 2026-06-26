@@ -28,8 +28,6 @@ export default async function WorkspacePage() {
     revisionCount: project._count.revisions,
     previewStatus: project.sandboxRuns[0]?.status,
   }));
-  const liveProjects = projectItems.filter((project) => project.previewStatus === "READY").length;
-  const attentionProjects = projectItems.filter((project) => project.previewStatus === "FAILED").length;
 
   return (
     <main className="min-h-dvh overflow-hidden bg-[#111110] px-5 py-5 text-zinc-100">
@@ -50,32 +48,10 @@ export default async function WorkspacePage() {
         {!activeWorkspace ? <WorkspaceOnboarding /> : (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
             <section className="grid content-start gap-5">
-              <div className="flex flex-col justify-between gap-8 px-1 py-2 md:flex-row md:items-end">
-                <div className="max-w-xl">
-                  <Badge variant="outline" className="border-[#f7ca58]/20 bg-[#f7ca58]/10 text-[#f7ca58]">
-                    {projectItems.length} connected
-                  </Badge>
-                  <h2 className="mt-4 text-4xl font-semibold tracking-[-0.06em] text-balance text-zinc-50">
-                    Choose a repo and continue the design pass.
-                  </h2>
-                  <p className="mt-3 max-w-lg text-sm leading-6 text-pretty text-zinc-500">
-                    Import public repositories, inspect their live preview, and keep review context attached to each project.
-                  </p>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-2xl bg-black/25 px-4 py-3">
-                    <p className="text-2xl font-semibold tabular-nums text-zinc-100">{projectItems.length}</p>
-                    <p className="mt-1 text-[11px] text-zinc-600">Projects</p>
-                  </div>
-                  <div className="rounded-2xl bg-black/25 px-4 py-3">
-                    <p className="text-2xl font-semibold tabular-nums text-[#f7ca58]">{liveProjects}</p>
-                    <p className="mt-1 text-[11px] text-zinc-600">Live</p>
-                  </div>
-                  <div className="rounded-2xl bg-black/25 px-4 py-3">
-                    <p className="text-2xl font-semibold tabular-nums text-rose-300">{attentionProjects}</p>
-                    <p className="mt-1 text-[11px] text-zinc-600">Failed</p>
-                  </div>
-                </div>
+              <div className="bg-[#171715] px-4 py-3">
+                <Badge variant="outline" className="border-[#f7ca58]/20 bg-[#f7ca58]/10 text-[#f7ca58]">
+                  {projectItems.length} connected
+                </Badge>
               </div>
 
               {projectItems.length ? <ProjectList projects={projectItems} /> : (
@@ -98,12 +74,6 @@ export default async function WorkspacePage() {
                   </span>
                 </div>
                 <ProjectImportForm workspaceId={activeWorkspace.id} />
-              </div>
-              <div className="text-xs leading-5 text-zinc-500">
-                <p className="font-medium text-zinc-300">Local AI experiments</p>
-                <p className="mt-2">
-                  Use the mock provider for free local UI experiments. A live provider still needs an API endpoint and key.
-                </p>
               </div>
             </aside>
           </div>
