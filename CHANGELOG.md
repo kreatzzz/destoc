@@ -35,6 +35,7 @@ All notable project decisions and changes are recorded here.
 - Component selections now accumulate as pills above the chat box and are sent as context with chat-driven review prompts.
 - Workspace branding now uses a compact `D.` wordmark and a warmer golden accent palette instead of the previous acid green.
 - The workspace logo now renders as a minimal yellow wordmark without a containing badge.
+- The workspace index now uses a denser project dashboard with status summaries, polished import surfaces, and icon-only project deletion.
 
 ### Deferred
 

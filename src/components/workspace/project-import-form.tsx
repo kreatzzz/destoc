@@ -19,23 +19,38 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
   }, [router, state.ok, state.projectId]);
 
   return (
-    <form action={action} className="grid gap-4 rounded-xl border bg-card p-5">
+    <form action={action} className="grid gap-4 text-zinc-100">
       <input type="hidden" name="workspaceId" value={workspaceId} />
       <div>
         <p className="text-sm font-medium">Import a public repository</p>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">Destoc stores repository metadata only. Repository execution remains isolated from application credentials.</p>
+        <p className="mt-1 text-sm leading-6 text-zinc-500">Destoc stores repository metadata only. Repository execution remains isolated from application credentials.</p>
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="github-url">GitHub repository URL</Label>
-        <Input id="github-url" name="githubUrl" type="url" placeholder="https://github.com/owner/repository" required />
+        <Label htmlFor="github-url" className="text-zinc-300">GitHub repository URL</Label>
+        <Input
+          id="github-url"
+          name="githubUrl"
+          type="url"
+          placeholder="https://github.com/owner/repository"
+          required
+          className="border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
+        />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="branch">Branch</Label>
-        <Input id="branch" name="defaultBranch" defaultValue="main" maxLength={255} />
+        <Label htmlFor="branch" className="text-zinc-300">Branch</Label>
+        <Input
+          id="branch"
+          name="defaultBranch"
+          defaultValue="main"
+          maxLength={255}
+          className="border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
+        />
       </div>
-      {state.message ? <p role="alert" className="text-sm text-destructive">{state.message}</p> : null}
+      {state.message ? <p role="alert" className="text-sm text-rose-300">{state.message}</p> : null}
       {state.ok ? <p role="status" className="text-sm text-[#f7ca58]">Repository imported. Opening workspace…</p> : null}
-      <Button type="submit" disabled={isPending}>{isPending ? "Importing…" : "Import repository"}</Button>
+      <Button type="submit" disabled={isPending} className="bg-[#f7ca58] text-[#1b1205] hover:bg-[#ffd879]">
+        {isPending ? "Importing…" : "Import repository"}
+      </Button>
     </form>
   );
 }
