@@ -45,7 +45,8 @@ export function WorkspaceChat({
   onActiveSelectionChange,
   onSelectionNoteChange,
 }: WorkspaceChatProps) {
-  const canSend = prompt.trim().length > 0 && !isAuditPending;
+  const hasSelectedElementNotes = selectedElements.some((element) => Boolean(element.note?.trim()));
+  const canSend = (prompt.trim().length > 0 || hasSelectedElementNotes) && !isAuditPending;
   const visibleSelections = selectedElements.slice(-visibleSelectionLimit);
   const hiddenSelectionCount = Math.max(0, selectedElements.length - visibleSelections.length);
   const activeSelection = selectedElements.find((element) => element.selector === activeSelectionSelector)
@@ -138,7 +139,7 @@ export function WorkspaceChat({
                 if (canSend) onSendPrompt();
               }
             }}
-            placeholder="Ask for a design audit or targeted improvement…"
+            placeholder={hasSelectedElementNotes ? "Optional: add extra direction for these notes…" : "Ask for a design audit or targeted improvement…"}
             className="max-h-40 min-h-24 resize-none border-0 bg-transparent px-2 py-2 text-sm text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
           />
           <div className="flex items-center justify-between px-1 pt-1">

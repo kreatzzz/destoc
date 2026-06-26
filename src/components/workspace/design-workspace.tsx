@@ -66,6 +66,30 @@ function mapSelectedElementForApi(element: WorkspaceSelectedElement | null) {
   };
 }
 
+function selectedElementLabel(element: WorkspaceSelectedElement) {
+  if (element.role) return element.role;
+  const text = element.text?.trim();
+  if (text) return text.slice(0, 48);
+  return element.selector.split(">").at(-1)?.trim() ?? element.selector;
+}
+
+function selectedElementNotesForPrompt(elements: WorkspaceSelectedElement[]) {
+  return elements
+    .map((element, index) => {
+      const note = element.note?.trim();
+      if (!note) return null;
+      return `#${index + 1} ${selectedElementLabel(element)}: ${note}`;
+    })
+    .filter((note): note is string => Boolean(note));
+}
+
+function buildReviewPrompt(prompt: string, selectedElementNotes: string[]) {
+  return [
+    prompt.trim(),
+    selectedElementNotes.length ? `Selected component notes:\n${selectedElementNotes.join("\n")}` : "",
+  ].filter(Boolean).join("\n\n");
+}
+
 export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const router = useRouter();
   const [designMode, setDesignMode] = useState(false);
@@ -240,13 +264,22 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
   async function sendPrompt() {
     const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt || isAuditPending) return;
+    const selectedElementNotes = selectedElementNotesForPrompt(selectedElements);
+    const reviewPrompt = buildReviewPrompt(trimmedPrompt, selectedElementNotes);
+    if (!reviewPrompt || isAuditPending) return;
 
     setPrompt("");
     setAuditError(null);
     setIsAuditPending(true);
     const messageId = crypto.randomUUID();
-    setMessages((current) => [...current, { id: messageId, role: "user", content: trimmedPrompt }]);
+    setMessages((current) => [
+      ...current,
+      {
+        id: messageId,
+        role: "user",
+        content: trimmedPrompt || `Using selected component notes:\n${selectedElementNotes.join("\n")}`,
+      },
+    ]);
 
     try {
       if (!previewUrl) throw new Error("Preview is still starting. Try again when it is live.");
@@ -285,7 +318,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           projectId: data.project.id,
           reviewTargetId: targetPayload.reviewTarget.id,
           scope: "PAGE",
-          prompt: trimmedPrompt,
+          prompt: reviewPrompt,
         }),
       });
       const reviewPayload = await reviewResponse.json().catch(() => null) as {

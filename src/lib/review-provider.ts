@@ -1,4 +1,8 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { z } from "zod";
 import { AppError } from "@/lib/errors";
 import { getServerEnv } from "@/lib/env";
@@ -207,9 +211,32 @@ class CommandReviewProvider implements DesignReviewProvider {
     return designReviewResultSchema.parse(JSON.parse(jsonText));
   }
 
-  private runCommand(input: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(this.command, this.args, {
+  private commandInvocation() {
+    const isCodexExec = this.command === "codex" && this.args[0] === "exec";
+    const alreadyCapturesLastMessage = this.args.includes("--output-last-message") || this.args.includes("-o");
+
+    if (!isCodexExec || alreadyCapturesLastMessage) {
+      return { args: this.args, outputPath: undefined };
+    }
+
+    const outputPath = join(tmpdir(), `destoc-command-review-${randomUUID()}.txt`);
+    const args = [...this.args];
+    const insertionIndex = args.at(-1) === "-" ? args.length - 1 : args.length;
+    args.splice(insertionIndex, 0, "--output-last-message", outputPath);
+    return { args, outputPath };
+  }
+
+  private commandErrorMessage(error: unknown) {
+    const raw = error instanceof Error ? error.message : String(error);
+    return raw.replace(/\u001b\[[0-9;]*m/g, "").replace(/\s+/g, " ").trim().slice(0, 600);
+  }
+
+  private async runCommand(input: string): Promise<string> {
+    const invocation = this.commandInvocation();
+
+    try {
+      const stdout = await new Promise<string>((resolve, reject) => {
+        const child = spawn(this.command, invocation.args, {
         env: {
           ...process.env,
           NO_COLOR: "1",
@@ -253,7 +280,19 @@ class CommandReviewProvider implements DesignReviewProvider {
         resolve(Buffer.concat(stdoutChunks).toString("utf8"));
       });
       child.stdin.end(input);
-    });
+      });
+
+      if (invocation.outputPath) {
+        const finalMessage = await readFile(invocation.outputPath, "utf8").catch(() => "");
+        if (finalMessage.trim()) return finalMessage;
+      }
+
+      return stdout;
+    } finally {
+      if (invocation.outputPath) {
+        await rm(invocation.outputPath, { force: true }).catch(() => undefined);
+      }
+    }
   }
 
   async review(request: DesignReviewRequest): Promise<DesignReviewResult> {
@@ -261,7 +300,12 @@ class CommandReviewProvider implements DesignReviewProvider {
     try {
       stdout = await this.runCommand(this.buildPrompt(request));
     } catch (error) {
-      throw new AppError("CONFIGURATION_ERROR", "Command review provider failed.", { cause: error });
+      const details = this.commandErrorMessage(error);
+      throw new AppError(
+        "CONFIGURATION_ERROR",
+        details ? `Command review provider failed: ${details}` : "Command review provider failed.",
+        { cause: error },
+      );
     }
 
     try {
