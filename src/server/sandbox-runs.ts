@@ -1,7 +1,9 @@
+import { Sandbox } from "@vercel/sandbox";
 import { SandboxRunStatus } from "@/generated/prisma/client";
 import { getPrisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { requireProjectOwnership } from "@/server/authorization";
+import { getSandboxCredentials } from "@/server/sandbox-credentials";
 import { enforceRateLimit } from "@/server/rate-limit";
 
 const allowedTransitions: Record<SandboxRunStatus, readonly SandboxRunStatus[]> = {
@@ -111,4 +113,33 @@ export async function probeSandboxRunHealth(userId: string, projectId: string, s
   } catch {
     return { sandboxRun: run, reachable: false, stopped: false };
   }
+}
+
+export async function stopSandboxRun(userId: string, projectId: string, sandboxRunId: string) {
+  await enforceRateLimit("sandbox", userId);
+  await requireProjectOwnership(projectId, userId);
+
+  const run = await getPrisma().sandboxRun.findFirst({
+    where: { id: sandboxRunId, projectId },
+  });
+  if (!run) throw new AppError("NOT_FOUND", "Sandbox run not found.");
+
+  if (run.status === "STOPPED" || run.status === "FAILED") return run;
+
+  try {
+    const credentials = getSandboxCredentials();
+    const sandbox = await Sandbox.get({
+      ...credentials,
+      name: `destoc-${run.id}`,
+      resume: false,
+    });
+    await sandbox.stop();
+  } catch (error) {
+    console.warn("Could not stop Vercel sandbox; marking run stopped locally", error);
+  }
+
+  return transitionSandboxRun(userId, run.id, "STOPPED", {
+    errorCode: "SANDBOX_STOPPED_BY_USER",
+    errorMessage: "Sandbox stopped by user.",
+  });
 }

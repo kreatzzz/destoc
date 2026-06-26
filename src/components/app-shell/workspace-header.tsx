@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Loader2, PanelRightClose, PanelRightOpen, RotateCcw, Square } from "lucide-react";
 
 import { AnimatedDeleteIcon } from "@/components/ui/animated-icons";
 import { DestocLogo } from "@/components/app-shell/destoc-logo";
@@ -26,6 +26,13 @@ interface WorkspaceHeaderProps {
   isPreviewStarting: boolean;
   onDisconnect: () => void;
   isDisconnecting: boolean;
+  onRestartSandbox: () => void;
+  onStopSandbox: () => void;
+  canStopSandbox: boolean;
+  isStoppingSandbox: boolean;
+  onToggleCodePane: () => void;
+  codePaneOpen: boolean;
+  hasCodeChanges: boolean;
 }
 
 export function WorkspaceHeader({
@@ -35,6 +42,13 @@ export function WorkspaceHeader({
   isPreviewStarting,
   onDisconnect,
   isDisconnecting,
+  onRestartSandbox,
+  onStopSandbox,
+  canStopSandbox,
+  isStoppingSandbox,
+  onToggleCodePane,
+  codePaneOpen,
+  hasCodeChanges,
 }: WorkspaceHeaderProps) {
   return (
     <header className="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-white/[0.07] bg-[#111110] px-3 text-zinc-300">
@@ -47,15 +61,63 @@ export function WorkspaceHeader({
         </div>
       </div>
 
-      <div className="flex min-w-0 items-center justify-center">
+      <div className="flex min-w-0 items-center justify-center gap-1.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Restart sandbox"
+              disabled={isPreviewStarting}
+              onClick={onRestartSandbox}
+              className="text-zinc-500 hover:bg-white/[0.06] hover:text-[#ffd879]"
+            >
+              <RotateCcw className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Restart sandbox</TooltipContent>
+        </Tooltip>
         <div className="flex max-w-[42vw] items-center gap-2 rounded-full bg-white/[0.04] px-2.5 py-1 text-xs text-zinc-400">
           <span className={cn("size-1.5 shrink-0 rounded-full", previewError ? "bg-rose-400" : isPreviewStarting ? "bg-amber-300" : "bg-[#f7ca58]")} />
           <span className="truncate">{previewStatusText}</span>
           {isPreviewStarting ? <Loader2 className="size-3 animate-spin text-zinc-500" /> : null}
         </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Stop sandbox"
+              disabled={!canStopSandbox || isStoppingSandbox}
+              onClick={onStopSandbox}
+              className="text-zinc-500 hover:bg-white/[0.06] hover:text-rose-200"
+            >
+              {isStoppingSandbox ? <Loader2 className="animate-spin" /> : <Square className="size-3.5" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stop sandbox</TooltipContent>
+        </Tooltip>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={codePaneOpen ? "Hide code changes" : "Show code changes"}
+              onClick={onToggleCodePane}
+              className={cn(
+                "relative text-zinc-500 hover:bg-white/[0.06] hover:text-[#ffd879]",
+                codePaneOpen && "bg-white/[0.06] text-[#ffd879]",
+              )}
+            >
+              {codePaneOpen ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
+              {hasCodeChanges ? <span className="absolute right-1 top-1 size-1.5 rounded-full bg-[#f7ca58]" /> : null}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{codePaneOpen ? "Hide code changes" : "Show code changes"}</TooltipContent>
+        </Tooltip>
         <AlertDialog>
           <Tooltip>
             <TooltipTrigger asChild>

@@ -53,10 +53,12 @@ const reviewJsonShape = "{\"summary\":\"string\",\"suggestions\":[{\"severity\":
 
 const implementationGuidance = [
   "If the user asks to implement, rewrite, optimize, or change a selected component, do not stop at advice.",
-  "Return a concrete implementation suggestion.",
-  "When you can identify a safe source file, include a unified diff in suggestion.patch using --- a/path and +++ b/path headers.",
+  "Return a concrete implementation suggestion with code.",
+  "Prefer editing one of evidence.sourceContext.candidates when candidates are available.",
+  "When a source candidate contains the relevant UI, include a unified diff in suggestion.patch using --- a/path and +++ b/path headers.",
   "Only propose patches under src/app, src/components, or CSS files.",
-  "If the source file cannot be inferred from the supplied evidence, do not hallucinate that it was applied; put the exact replacement copy/code in intendedOutcome and explain the missing source-file constraint in issue.",
+  "If the exact text is not present, still inspect nearby candidate files and patch the most likely UI source when the requested change is low-risk.",
+  "Only omit suggestion.patch when there is genuinely no safe source candidate.",
 ].join(" ");
 
 function providerRequestPayload(request: DesignReviewRequest) {

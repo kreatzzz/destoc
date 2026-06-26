@@ -24,6 +24,13 @@ export type DesignReviewEvidence = {
     url: string;
     defaultBranch: string;
   };
+  sourceContext?: {
+    note: string;
+    candidates: Array<{
+      path: string;
+      content: string;
+    }>;
+  };
   sourceFilePath?: string;
   selectedElement?: {
     selector: string;

@@ -7,21 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { WorkspaceChatMessage, WorkspaceSelectedElement, WorkspaceSuggestion } from "./types";
+import type { WorkspaceChatMessage, WorkspaceSelectedElement } from "./types";
 
 interface WorkspaceChatProps {
   selectedElements: WorkspaceSelectedElement[];
   activeSelectionSelector: string | null;
   messages: WorkspaceChatMessage[];
-  suggestions: WorkspaceSuggestion[];
   prompt: string;
   isAuditPending: boolean;
   auditError: string | null;
-  pendingSuggestionId: string | null;
   onPromptChange: (value: string) => void;
   onSendPrompt: () => void;
-  onAcceptSuggestion: (suggestionId: string) => void;
-  onRejectSuggestion: (suggestionId: string) => void;
   onRemoveSelection: (selector: string) => void;
   onActiveSelectionChange: (selector: string) => void;
   onSelectionNoteChange: (selector: string, note: string) => void;
@@ -40,15 +36,11 @@ export function WorkspaceChat({
   selectedElements,
   activeSelectionSelector,
   messages,
-  suggestions,
   prompt,
   isAuditPending,
   auditError,
-  pendingSuggestionId,
   onPromptChange,
   onSendPrompt,
-  onAcceptSuggestion,
-  onRejectSuggestion,
   onRemoveSelection,
   onActiveSelectionChange,
   onSelectionNoteChange,
@@ -72,62 +64,6 @@ export function WorkspaceChat({
             {message.content}
           </div>
         ))}
-        {suggestions.length ? (
-          <div className="space-y-2">
-            {suggestions.map((suggestion) => {
-              const isPending = pendingSuggestionId === suggestion.id;
-              const hasPatch = Boolean(suggestion.patch?.trim());
-
-              return (
-                <article key={suggestion.id} className="rounded-xl border border-white/[0.07] bg-white/[0.035] p-3 text-sm text-zinc-300">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-zinc-100">{suggestion.title}</p>
-                      <p className="mt-1 text-xs text-zinc-500">{suggestion.impact} · {suggestion.status}</p>
-                    </div>
-                    <span className={cn(
-                      "shrink-0 rounded-full px-2 py-0.5 text-[10px]",
-                      hasPatch ? "bg-[#f7ca58]/15 text-[#ffd879]" : "bg-white/[0.06] text-zinc-500",
-                    )}>
-                      {hasPatch ? "patch" : "copy"}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs leading-5 text-zinc-400">{suggestion.summary}</p>
-                  {suggestion.patch ? (
-                    <pre className="mt-3 max-h-32 overflow-auto rounded-lg bg-black/30 p-2 text-[10px] leading-4 text-zinc-300">
-                      <code>{suggestion.patch}</code>
-                    </pre>
-                  ) : (
-                    <p className="mt-3 rounded-lg bg-black/20 p-2 text-xs leading-5 text-zinc-400">
-                      No safe patch was returned. Use the rationale as implementation copy until source-file mapping is added.
-                    </p>
-                  )}
-                  {suggestion.status === "pending" ? (
-                    <div className="mt-3 flex items-center justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={isPending}
-                        onClick={() => onRejectSuggestion(suggestion.id)}
-                        className="h-8 text-zinc-400 hover:text-zinc-100"
-                      >
-                        Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        disabled={!hasPatch || isPending}
-                        onClick={() => onAcceptSuggestion(suggestion.id)}
-                        className="h-8 bg-[#f7ca58] text-[#1b1205] hover:bg-[#ffd879]"
-                      >
-                        {isPending ? "Working…" : hasPatch ? "Accept patch" : "Needs source"}
-                      </Button>
-                    </div>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
-        ) : null}
         {auditError ? <p role="alert" className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">{auditError}</p> : null}
       </div>
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { WorkspaceHeader } from "@/components/app-shell/workspace-header";
 import { CanvasPreview } from "./canvas-preview";
+import { CodeChangesPane } from "./code-changes-pane";
 import { WorkspaceChat } from "./workspace-chat";
 import type { WorkspaceChatMessage, WorkspaceData, WorkspacePreview, WorkspaceSelectedElement, WorkspaceSuggestion } from "./types";
 
@@ -139,6 +140,8 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const [isAuditPending, setIsAuditPending] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [pendingSuggestionId, setPendingSuggestionId] = useState<string | null>(null);
+  const [codePaneOpen, setCodePaneOpen] = useState(data.suggestions.some((suggestion) => suggestion.patch?.trim()));
+  const [isStoppingPreview, setIsStoppingPreview] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const activeRunRef = useRef<string | undefined>(data.preview?.runId);
   const startingRef = useRef(false);
@@ -148,6 +151,8 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     () => progressText(previewStatus, previewLogs, previewUrl, previewError),
     [previewError, previewLogs, previewStatus, previewUrl],
   );
+  const hasCodeChanges = suggestions.some((suggestion) => suggestion.patch?.trim());
+  const canStopPreview = Boolean(sandboxRunId && previewStatus && !["STOPPED", "FAILED"].includes(previewStatus));
 
   const applyRunState = useCallback((run: SandboxRunPayload) => {
     setSandboxRunId(run.id);
@@ -227,6 +232,37 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       startingRef.current = false;
     }
   }, [applyRunState, data.project.id, pollSandboxRun]);
+
+  const stopPreview = useCallback(async () => {
+    if (!sandboxRunId || isStoppingPreview) return;
+
+    setIsStoppingPreview(true);
+    try {
+      const response = await fetch(`/api/projects/${data.project.id}/sandbox-runs/${sandboxRunId}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => null) as { sandboxRun?: SandboxRunPayload; error?: { message?: string } } | null;
+      if (!response.ok || !payload?.sandboxRun) {
+        throw new Error(payload?.error?.message ?? "Sandbox could not be stopped.");
+      }
+      activeRunRef.current = undefined;
+      setPreviewUrl(undefined);
+      setIsPreviewStarting(false);
+      applyRunState(payload.sandboxRun);
+    } catch (error) {
+      setPreviewError(error instanceof Error ? error.message : "Sandbox could not be stopped.");
+    } finally {
+      setIsStoppingPreview(false);
+    }
+  }, [applyRunState, data.project.id, isStoppingPreview, sandboxRunId]);
+
+  const restartPreview = useCallback(async () => {
+    if (isPreviewStarting) return;
+    if (sandboxRunId && previewStatus && !["STOPPED", "FAILED"].includes(previewStatus)) {
+      await stopPreview();
+    }
+    await startPreview();
+  }, [isPreviewStarting, previewStatus, sandboxRunId, startPreview, stopPreview]);
 
   useEffect(() => {
     if (sandboxRunId) activeRunRef.current = sandboxRunId;
@@ -357,10 +393,15 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
       const nextSuggestions = reviewPayload?.review?.suggestions?.map(mapReviewSuggestion) ?? [];
       setSuggestions(nextSuggestions);
-      const summary = reviewPayload?.review?.result?.summary
-        ?? reviewPayload?.review?.suggestions?.[0]?.title
-        ?? "I created a new design review from your selected context.";
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: summary }]);
+      setCodePaneOpen(true);
+      const hasPatch = nextSuggestions.some((suggestion) => suggestion.patch?.trim());
+      setMessages((current) => [...current, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: hasPatch
+          ? "I drafted code changes and opened the code pane."
+          : "I could not draft a safe diff yet. Open the code pane for the source context result.",
+      }]);
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not complete the review.";
@@ -441,21 +482,24 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
         isPreviewStarting={isPreviewStarting}
         onDisconnect={() => void disconnectProject()}
         isDisconnecting={isDisconnecting}
+        onRestartSandbox={() => void restartPreview()}
+        onStopSandbox={() => void stopPreview()}
+        canStopSandbox={canStopPreview}
+        isStoppingSandbox={isStoppingPreview}
+        onToggleCodePane={() => setCodePaneOpen((open) => !open)}
+        codePaneOpen={codePaneOpen}
+        hasCodeChanges={hasCodeChanges}
       />
       <div className="flex min-h-0 flex-1">
         <WorkspaceChat
           selectedElements={selectedElements}
           activeSelectionSelector={activeSelectionSelector}
           messages={messages}
-          suggestions={suggestions}
           prompt={prompt}
           isAuditPending={isAuditPending}
           auditError={auditError}
-          pendingSuggestionId={pendingSuggestionId}
           onPromptChange={setPrompt}
           onSendPrompt={() => void sendPrompt()}
-          onAcceptSuggestion={(suggestionId) => void acceptSuggestion(suggestionId)}
-          onRejectSuggestion={(suggestionId) => void rejectSuggestion(suggestionId)}
           onRemoveSelection={removeSelectedElement}
           onActiveSelectionChange={setActiveSelectionSelector}
           onSelectionNoteChange={updateSelectedElementNote}
@@ -470,6 +514,15 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           onDesignModeChange={setDesignMode}
           onSelectionChange={addSelectedElement}
         />
+        {codePaneOpen ? (
+          <CodeChangesPane
+            suggestions={suggestions}
+            pendingSuggestionId={pendingSuggestionId}
+            onAcceptSuggestion={(suggestionId) => void acceptSuggestion(suggestionId)}
+            onRejectSuggestion={(suggestionId) => void rejectSuggestion(suggestionId)}
+            onClose={() => setCodePaneOpen(false)}
+          />
+        ) : null}
       </div>
     </div>
   );

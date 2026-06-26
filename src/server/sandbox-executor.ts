@@ -2,6 +2,7 @@ import { Sandbox } from "@vercel/sandbox";
 import { AppError, asAppError } from "@/lib/errors";
 import { requireProjectOwnership } from "@/server/authorization";
 import { createPreviewBridgeProxyScript } from "@/server/preview-bridge";
+import { getSandboxCredentials } from "@/server/sandbox-credentials";
 import { transitionSandboxRun, updateSandboxRunProgress } from "@/server/sandbox-runs";
 
 // A preview is interactive product work, not a short command. Keep it alive
@@ -25,37 +26,11 @@ const PREVIEW_RUNTIME_HOSTS = [
   "umami.cooldash.xyz",
 ];
 
-type SandboxCredentials = {
-  token: string;
-  teamId: string;
-  projectId: string;
-};
-
 type PackageScripts = {
   build?: string;
   dev?: string;
   start?: string;
 };
-
-/**
- * The Sandbox SDK receives platform credentials to create a VM, but no app
- * credentials are ever sent into the VM. The cloned repository is public and
- * all commands run with an empty environment supplied by this application.
- */
-function getSandboxCredentials(): SandboxCredentials {
-  const token = process.env.VERCEL_TOKEN?.trim();
-  const teamId = process.env.VERCEL_TEAM_ID?.trim();
-  const projectId = process.env.VERCEL_PROJECT_ID?.trim();
-
-  if (!token || !teamId || !projectId) {
-    throw new AppError(
-      "CONFIGURATION_ERROR",
-      "Sandbox execution requires VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID.",
-    );
-  }
-
-  return { token, teamId, projectId };
-}
 
 function truncateLog(value: string): string {
   return value.length <= MAX_PERSISTED_LOG_LENGTH

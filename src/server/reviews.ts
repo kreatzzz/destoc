@@ -11,6 +11,7 @@ import {
 import { requireProjectOwnership } from "@/server/authorization";
 import { assertPatchIsAllowed } from "@/server/patches";
 import { enforceRateLimit } from "@/server/rate-limit";
+import { sourceContextForReview } from "@/server/source-context";
 
 export async function createReviewTarget(userId: string, input: CreateReviewTargetInput | unknown) {
   await enforceRateLimit("mutation", userId);
@@ -83,6 +84,11 @@ export async function runReview(userId: string, input: CreateReviewInput | unkno
   });
 
   try {
+    const sourceContext = await sourceContextForReview(target.project, target, parsed.prompt).catch(() => ({
+      candidates: [],
+      note: "Source context lookup failed; provider received DOM evidence only.",
+    }));
+
     const result = await provider.review({
       scope: parsed.scope,
       prompt: parsed.prompt,
@@ -94,6 +100,7 @@ export async function runReview(userId: string, input: CreateReviewInput | unkno
           url: target.project.githubUrl,
           defaultBranch: target.project.defaultBranch,
         },
+        sourceContext,
         sourceFilePath: target.sourceFilePath ?? undefined,
         selectedElement: target.element
           ? {

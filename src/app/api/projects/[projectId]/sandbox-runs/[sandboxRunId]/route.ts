@@ -3,7 +3,7 @@ import { getPrisma } from "@/lib/db";
 import { AppError, withRouteErrorHandling } from "@/lib/errors";
 import { requireCurrentUser } from "@/lib/auth";
 import { requireProjectOwnership } from "@/server/authorization";
-import { probeSandboxRunHealth } from "@/server/sandbox-runs";
+import { probeSandboxRunHealth, stopSandboxRun } from "@/server/sandbox-runs";
 
 export const runtime = "nodejs";
 
@@ -27,6 +27,15 @@ export async function GET(request: Request, { params }: RouteContext) {
     });
     if (!sandboxRun) throw new AppError("NOT_FOUND", "Sandbox run not found.");
 
+    return NextResponse.json({ sandboxRun });
+  });
+}
+
+export async function DELETE(_request: Request, { params }: RouteContext) {
+  return withRouteErrorHandling(async () => {
+    const user = await requireCurrentUser();
+    const { projectId, sandboxRunId } = await params;
+    const sandboxRun = await stopSandboxRun(user.id, projectId, sandboxRunId);
     return NextResponse.json({ sandboxRun });
   });
 }
