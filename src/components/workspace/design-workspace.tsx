@@ -34,6 +34,9 @@ const defaultData: WorkspaceData = {
   suggestions: [],
 };
 
+const defaultChatWidth = 360;
+const defaultCodePaneWidth = 420;
+
 interface DesignWorkspaceProps {
   data?: WorkspaceData;
 }
@@ -141,6 +144,8 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [pendingSuggestionId, setPendingSuggestionId] = useState<string | null>(null);
   const [codePaneOpen, setCodePaneOpen] = useState(data.suggestions.some((suggestion) => suggestion.patch?.trim()));
+  const [chatWidth, setChatWidth] = useState(defaultChatWidth);
+  const [codePaneWidth, setCodePaneWidth] = useState(defaultCodePaneWidth);
   const [isStoppingPreview, setIsStoppingPreview] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const activeRunRef = useRef<string | undefined>(data.preview?.runId);
@@ -496,6 +501,8 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       />
       <div className="flex min-h-0 flex-1">
         <WorkspaceChat
+          width={chatWidth}
+          onWidthChange={setChatWidth}
           selectedElements={selectedElements}
           activeSelectionSelector={activeSelectionSelector}
           messages={messages}
@@ -518,15 +525,21 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           onDesignModeChange={setDesignMode}
           onSelectionChange={addSelectedElement}
         />
-        {codePaneOpen ? (
+        <div
+          className={`h-full shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-out ${codePaneOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          style={{ width: codePaneOpen ? codePaneWidth : 0 }}
+          aria-hidden={!codePaneOpen}
+        >
           <CodeChangesPane
+            width={codePaneWidth}
+            onWidthChange={setCodePaneWidth}
             suggestions={suggestions}
             pendingSuggestionId={pendingSuggestionId}
             onAcceptSuggestion={(suggestionId) => void acceptSuggestion(suggestionId)}
             onRejectSuggestion={(suggestionId) => void rejectSuggestion(suggestionId)}
             onClose={() => setCodePaneOpen(false)}
           />
-        ) : null}
+        </div>
       </div>
     </div>
   );

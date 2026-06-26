@@ -1,9 +1,12 @@
 import { X } from "lucide-react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { WorkspaceSuggestion } from "./types";
 
 interface CodeChangesPaneProps {
+  width: number;
+  onWidthChange: (width: number) => void;
   suggestions: WorkspaceSuggestion[];
   pendingSuggestionId: string | null;
   onAcceptSuggestion: (suggestionId: string) => void;
@@ -11,7 +14,16 @@ interface CodeChangesPaneProps {
   onClose: () => void;
 }
 
+const minCodePaneWidth = 340;
+const maxCodePaneWidth = 720;
+
+function clampWidth(width: number) {
+  return Math.min(maxCodePaneWidth, Math.max(minCodePaneWidth, width));
+}
+
 export function CodeChangesPane({
+  width,
+  onWidthChange,
   suggestions,
   pendingSuggestionId,
   onAcceptSuggestion,
@@ -20,8 +32,40 @@ export function CodeChangesPane({
 }: CodeChangesPaneProps) {
   const patchSuggestions = suggestions.filter((suggestion) => suggestion.patch?.trim());
 
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      onWidthChange(clampWidth(startWidth + startX - moveEvent.clientX));
+    };
+
+    const onPointerUp = () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
+  }
+
   return (
-    <aside className="flex h-full w-[420px] shrink-0 flex-col border-l border-white/[0.07] bg-[#111110] text-zinc-200 shadow-[-20px_0_60px_rgba(0,0,0,0.22)]">
+    <aside className="relative flex h-full w-full shrink-0 flex-col border-l border-white/[0.07] bg-[#111110] text-zinc-200 shadow-[-20px_0_60px_rgba(0,0,0,0.22)]">
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize code changes"
+        onPointerDown={startResize}
+        className="absolute left-0 top-0 z-20 h-full w-2 cursor-col-resize touch-none bg-transparent transition-[background-color] duration-150 hover:bg-[#f7ca58]/20"
+      />
       <div className="flex h-12 shrink-0 items-center justify-between px-4">
         <div className="min-w-0">
           <p className="text-sm font-medium text-zinc-100">Code changes</p>

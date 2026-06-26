@@ -1,5 +1,6 @@
 "use client";
 
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { Loader2 } from "lucide-react";
 
 import { AnimatedArrowUpIcon, AnimatedXIcon } from "@/components/ui/animated-icons";
@@ -10,6 +11,8 @@ import { cn } from "@/lib/utils";
 import type { WorkspaceChatMessage, WorkspaceSelectedElement } from "./types";
 
 interface WorkspaceChatProps {
+  width: number;
+  onWidthChange: (width: number) => void;
   selectedElements: WorkspaceSelectedElement[];
   activeSelectionSelector: string | null;
   messages: WorkspaceChatMessage[];
@@ -31,8 +34,16 @@ function elementLabel(element: WorkspaceSelectedElement) {
 }
 
 const visibleSelectionLimit = 3;
+const minChatWidth = 300;
+const maxChatWidth = 560;
+
+function clampWidth(width: number) {
+  return Math.min(maxChatWidth, Math.max(minChatWidth, width));
+}
 
 export function WorkspaceChat({
+  width,
+  onWidthChange,
   selectedElements,
   activeSelectionSelector,
   messages,
@@ -56,8 +67,43 @@ export function WorkspaceChat({
     ? selectedElements.findIndex((element) => element.selector === activeSelection.selector) + 1
     : 0;
 
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      onWidthChange(clampWidth(startWidth + moveEvent.clientX - startX));
+    };
+
+    const onPointerUp = () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
+  }
+
   return (
-    <aside className="flex h-full w-[360px] shrink-0 flex-col border-r border-white/[0.07] bg-[#111110] text-zinc-200">
+    <aside
+      className="relative flex h-full shrink-0 flex-col border-r border-white/[0.07] bg-[#111110] text-zinc-200"
+      style={{ width }}
+    >
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize chat"
+        onPointerDown={startResize}
+        className="absolute right-0 top-0 z-20 h-full w-2 cursor-col-resize touch-none bg-transparent transition-[background-color] duration-150 hover:bg-[#f7ca58]/20"
+      />
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.map((message) => (
           <div key={message.id} className={cn("rounded-lg px-3 py-2.5 text-sm leading-6", message.role === "user" ? "ml-8 bg-[#f7ca58] text-[#1b1205]" : "mr-8 bg-white/[0.04] text-zinc-300")}>

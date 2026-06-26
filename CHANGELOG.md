@@ -45,6 +45,7 @@ All notable project decisions and changes are recorded here.
 - Review generation now fetches bounded public GitHub source candidates so providers can draft real diffs instead of source-missing advice; workspace chat is simplified and code changes live in a collapsible right pane.
 - Workspace top bar now includes restart/stop sandbox controls and a code-changes pane toggle.
 - Added a deterministic selected-text replacement fallback for simple copy edits, made the code pane show code diffs only, added an animated drafting bubble, and clear selected components immediately after prompt submission.
+- Workspace chat and code-diff panes are now horizontally resizable, and the code pane opens/closes with an interruptible width/opacity transition while the center sandbox preview flexes responsively.
 
 ### Deferred
 
