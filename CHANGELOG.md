@@ -51,6 +51,7 @@ All notable project decisions and changes are recorded here.
 - Suggestion decisions now live in compact chat cards while the code pane shows only diffs; accepting a suggestion applies its patch to the running sandbox and reloads the preview when ready.
 - Accepted patches now tolerate fenced/malformed provider diffs with `git apply --recount` plus an exact-block fallback, and multi-component selections now use stable local IDs for pills, notes, and removal.
 - Repository import now verifies public GitHub repository and branch existence, code changes no longer auto-open, accepted patches apply to the running sandbox, `/workspace` uses logout instead of project deletion, chat surfaces are more minimal, invalid provider diffs are rejected before accept, direct multi-component text notes produce one combined patch, and `DESIGN.md` defines the Destoc design system.
+- Suggestion acceptance now marks suggestions as accepted only after the sandbox patch applies successfully; failed patch applications leave suggestions retryable.
 
 ### Deferred
 

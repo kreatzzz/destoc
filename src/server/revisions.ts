@@ -1,4 +1,4 @@
-import { RevisionStatus } from "@/generated/prisma/client";
+import { Prisma, RevisionStatus } from "@/generated/prisma/client";
 import { getPrisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { rejectSuggestionSchema } from "@/lib/schemas";
@@ -27,31 +27,52 @@ export async function acceptSuggestion(userId: string, suggestionId: string) {
   const normalizedPatch = normalizeUnifiedDiff(suggestion.patch);
   assertPatchIsAllowed(normalizedPatch, suggestion.review.reviewTarget.sourceFilePath ?? undefined);
 
-  return getPrisma().$transaction(async (transaction) => {
-    const changed = await transaction.suggestion.updateMany({
-      where: { id: suggestion.id, status: "PENDING" },
-      data: { status: "ACCEPTED" },
-    });
-    if (changed.count !== 1) {
-      throw new AppError("CONFLICT", "This suggestion was already decided.");
-    }
-
+  try {
     const sandboxRunId = suggestion.review.reviewTarget.sandboxRunId;
     if (!sandboxRunId) {
       throw new AppError("CONFLICT", "This suggestion is not attached to a live sandbox preview.");
     }
 
-    return transaction.revision.create({
-      data: {
-        projectId: suggestion.review.projectId,
-        suggestionId: suggestion.id,
-        sandboxRunId,
-        patch: normalizedPatch,
-        status: "QUEUED",
-      },
-      include: { sandboxRun: true, beforeScreenshot: true, afterScreenshot: true },
+    return await getPrisma().$transaction(async (transaction) => {
+      const existingRevision = await transaction.revision.findUnique({
+        where: { suggestionId: suggestion.id },
+      });
+
+      if (existingRevision) {
+        if (existingRevision.status !== "FAILED") {
+          throw new AppError("CONFLICT", "This suggestion is already being applied.");
+        }
+
+        return transaction.revision.update({
+          where: { id: existingRevision.id },
+          data: {
+            sandboxRunId,
+            patch: normalizedPatch,
+            status: "QUEUED",
+            errorCode: null,
+            errorMessage: null,
+          },
+          include: { sandboxRun: true, beforeScreenshot: true, afterScreenshot: true },
+        });
+      }
+
+      return transaction.revision.create({
+        data: {
+          projectId: suggestion.review.projectId,
+          suggestionId: suggestion.id,
+          sandboxRunId,
+          patch: normalizedPatch,
+          status: "QUEUED",
+        },
+        include: { sandboxRun: true, beforeScreenshot: true, afterScreenshot: true },
+      });
     });
-  });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new AppError("CONFLICT", "This suggestion is already being applied.", { cause: error });
+    }
+    throw error;
+  }
 }
 
 export async function rejectSuggestion(userId: string, suggestionId: string, input: unknown = {}) {
@@ -88,10 +109,36 @@ export async function transitionRevision(
     throw new AppError("CONFLICT", `Cannot transition a ${revision.status} revision to ${nextStatus}.`);
   }
 
-  return getPrisma().revision.update({
+  if (nextStatus === "READY") {
+    return getPrisma().$transaction(async (transaction) => {
+      const updatedRevision = await transaction.revision.update({
+        where: { id: revision.id },
+        data: { status: nextStatus, errorCode: null, errorMessage: null },
+      });
+      await transaction.suggestion.update({
+        where: { id: revision.suggestionId },
+        data: { status: "ACCEPTED", errorCode: null, errorMessage: null },
+      });
+      return updatedRevision;
+    });
+  }
+
+  const updatedRevision = await getPrisma().revision.update({
     where: { id: revision.id },
     data: { status: nextStatus, ...metadata },
   });
+
+  if (nextStatus === "FAILED") {
+    await getPrisma().suggestion.update({
+      where: { id: revision.suggestionId },
+      data: {
+        errorCode: metadata.errorCode,
+        errorMessage: metadata.errorMessage,
+      },
+    });
+  }
+
+  return updatedRevision;
 }
 
 export async function getRevision(userId: string, revisionId: string) {
