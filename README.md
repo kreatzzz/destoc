@@ -56,8 +56,19 @@ LOCAL_AI_API_KEY=""
 
 Do not point this at cached Codex or ChatGPT session tokens. Destoc only supports explicit provider endpoints and explicit env-provided credentials.
 
+If you want to experiment with a local command bridge, Destoc can invoke an explicit command and parse JSON from stdout:
+
+```bash
+DESIGN_REVIEW_PROVIDER="command"
+COMMAND_AI_BIN="codex"
+COMMAND_AI_ARGS='["exec","--sandbox","read-only","--ask-for-approval","never","--ephemeral","-"]'
+COMMAND_AI_TIMEOUT_MS="120000"
+```
+
+This path relies on your local CLI being authenticated already. It does not inspect or copy cached Codex credentials, and it is disabled in production unless `ALLOW_COMMAND_REVIEW_PROVIDER="true"` is set.
+
 ## Current limitations
 
-- The deterministic mock provider remains the safest free default. A local OpenAI-compatible provider is available for experiments, and the DeepSeek provider boundary exists, but the production DeepSeek integration is not yet implemented.
+- The deterministic mock provider remains the safest free default. Local OpenAI-compatible and command providers are available for experiments, and the DeepSeek provider boundary exists, but the production DeepSeek integration is not yet implemented.
 - Only common public Next.js/Vite-style repositories are in scope. Private repositories, GitHub OAuth, GitHub write-back/PRs, webhooks, and scheduled reviews are deferred.
 - `DESIGN.md` is intentionally deferred until core product work is approved, per project guidance.

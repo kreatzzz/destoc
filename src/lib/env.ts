@@ -13,6 +13,25 @@ const optionalString = z
   .or(z.literal(""))
   .transform((value) => value || undefined);
 
+const commandArgsSchema = z
+  .string()
+  .optional()
+  .or(z.literal(""))
+  .transform((value, context) => {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) return parsed;
+    } catch {
+      // Report below as one consistent validation issue.
+    }
+    context.addIssue({
+      code: "custom",
+      message: "COMMAND_AI_ARGS must be a JSON array of strings",
+    });
+    return z.NEVER;
+  });
+
 const serverEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid PostgreSQL connection URL"),
@@ -22,11 +41,18 @@ const serverEnvSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional().or(z.literal("")),
   VERCEL_TOKEN: z.string().optional().or(z.literal("")),
   BLOB_READ_WRITE_TOKEN: z.string().optional().or(z.literal("")),
-  DESIGN_REVIEW_PROVIDER: z.enum(["mock", "deepseek", "local"]).default("mock"),
+  DESIGN_REVIEW_PROVIDER: z.enum(["mock", "deepseek", "local", "command"]).default("mock"),
   DEEPSEEK_API_KEY: optionalString,
   LOCAL_AI_BASE_URL: optionalUrl,
   LOCAL_AI_API_KEY: optionalString,
   LOCAL_AI_MODEL: z.string().optional().or(z.literal("")).transform((value) => value || "local-model"),
+  COMMAND_AI_BIN: optionalString,
+  COMMAND_AI_ARGS: commandArgsSchema,
+  COMMAND_AI_TIMEOUT_MS: z.preprocess(
+    (value) => value === "" || value == null ? undefined : value,
+    z.coerce.number().int().min(1_000).max(300_000).default(120_000),
+  ),
+  ALLOW_COMMAND_REVIEW_PROVIDER: z.string().optional().transform((value) => value === "true"),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -53,6 +79,10 @@ export function getServerEnv(): ServerEnv {
       LOCAL_AI_BASE_URL: process.env.LOCAL_AI_BASE_URL,
       LOCAL_AI_API_KEY: process.env.LOCAL_AI_API_KEY,
       LOCAL_AI_MODEL: process.env.LOCAL_AI_MODEL,
+      COMMAND_AI_BIN: process.env.COMMAND_AI_BIN,
+      COMMAND_AI_ARGS: process.env.COMMAND_AI_ARGS,
+      COMMAND_AI_TIMEOUT_MS: process.env.COMMAND_AI_TIMEOUT_MS,
+      ALLOW_COMMAND_REVIEW_PROVIDER: process.env.ALLOW_COMMAND_REVIEW_PROVIDER,
     });
   }
 

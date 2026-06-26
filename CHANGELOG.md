@@ -16,7 +16,7 @@ All notable project decisions and changes are recorded here.
 - Vitest coverage for GitHub source validation, selected-element payload bounds, and patch safety.
 - Docker Compose PostgreSQL development service, initial Prisma migration, and automatic `.env` loading for Prisma commands and seeds.
 - A visible destructive project deletion action that removes only Destoc-owned project data, never the GitHub repository.
-- Local OpenAI-compatible design review provider support for experiments without DeepSeek API usage.
+- Local OpenAI-compatible and explicit command design review provider support for experiments without DeepSeek API usage.
 
 ### Changed
 

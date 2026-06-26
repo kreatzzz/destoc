@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { z } from "zod";
 import { AppError } from "@/lib/errors";
 import { getServerEnv } from "@/lib/env";
@@ -28,7 +29,7 @@ export type DesignReviewRequest = {
 };
 
 export interface DesignReviewProvider {
-  readonly id: "mock" | "deepseek" | "local";
+  readonly id: "mock" | "deepseek" | "local" | "command";
   review(request: DesignReviewRequest): Promise<DesignReviewResult>;
 }
 
@@ -169,6 +170,110 @@ class LocalOpenAICompatibleProvider implements DesignReviewProvider {
   }
 }
 
+class CommandReviewProvider implements DesignReviewProvider {
+  readonly id = "command" as const;
+
+  constructor(
+    private readonly command: string,
+    private readonly args: string[],
+    private readonly timeoutMs: number,
+  ) {}
+
+  private buildPrompt(request: DesignReviewRequest) {
+    return [
+      "You are Destoc's design-review provider.",
+      "Return only valid JSON. Do not include markdown fences or commentary.",
+      "The JSON must match this shape:",
+      "{\"summary\":\"string\",\"suggestions\":[{\"severity\":\"low|medium|high\",\"confidence\":0.8,\"title\":\"string\",\"issue\":\"string\",\"rationale\":\"string\",\"intendedOutcome\":\"string\",\"verificationChecklist\":[\"string\"]}]}",
+      "Keep suggestions practical, visual, and based only on the supplied evidence.",
+      "",
+      "Request:",
+      JSON.stringify({
+        scope: request.scope,
+        prompt: request.prompt,
+        evidence: request.evidence,
+      }),
+    ].join("\n");
+  }
+
+  private parseCommandOutput(output: string): DesignReviewResult {
+    const trimmed = output.trim();
+    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    const candidate = fencedMatch?.[1] ?? trimmed;
+    const start = candidate.indexOf("{");
+    const end = candidate.lastIndexOf("}");
+    const jsonText = start >= 0 && end > start ? candidate.slice(start, end + 1) : candidate;
+
+    return designReviewResultSchema.parse(JSON.parse(jsonText));
+  }
+
+  private runCommand(input: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(this.command, this.args, {
+        env: {
+          ...process.env,
+          NO_COLOR: "1",
+        },
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      const timeout = setTimeout(() => {
+        child.kill("SIGTERM");
+        reject(new Error(`Command review provider timed out after ${this.timeoutMs}ms.`));
+      }, this.timeoutMs);
+      const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+      let stdoutBytes = 0;
+      let stderrBytes = 0;
+      const maxBuffer = 1024 * 1024;
+
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdoutBytes += chunk.byteLength;
+        if (stdoutBytes > maxBuffer) {
+          child.kill("SIGTERM");
+          reject(new Error("Command review provider stdout exceeded 1MB."));
+          return;
+        }
+        stdoutChunks.push(chunk);
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderrBytes += chunk.byteLength;
+        if (stderrBytes <= maxBuffer) stderrChunks.push(chunk);
+      });
+      child.on("error", (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timeout);
+        if (code !== 0) {
+          const stderr = Buffer.concat(stderrChunks).toString("utf8").trim();
+          reject(new Error(stderr || `Command review provider exited with code ${code}.`));
+          return;
+        }
+        resolve(Buffer.concat(stdoutChunks).toString("utf8"));
+      });
+      child.stdin.end(input);
+    });
+  }
+
+  async review(request: DesignReviewRequest): Promise<DesignReviewResult> {
+    let stdout = "";
+    try {
+      stdout = await this.runCommand(this.buildPrompt(request));
+    } catch (error) {
+      throw new AppError("CONFIGURATION_ERROR", "Command review provider failed.", { cause: error });
+    }
+
+    try {
+      return this.parseCommandOutput(stdout);
+    } catch (error) {
+      throw new AppError("CONFIGURATION_ERROR", "Command review provider returned invalid review JSON.", {
+        cause: error,
+      });
+    }
+  }
+}
+
 export function getDesignReviewProvider(): DesignReviewProvider {
   const env = getServerEnv();
 
@@ -184,6 +289,16 @@ export function getDesignReviewProvider(): DesignReviewProvider {
       throw new AppError("CONFIGURATION_ERROR", "LOCAL_AI_BASE_URL is required for the local review provider.");
     }
     return new LocalOpenAICompatibleProvider(env.LOCAL_AI_BASE_URL, env.LOCAL_AI_MODEL, env.LOCAL_AI_API_KEY);
+  }
+
+  if (env.DESIGN_REVIEW_PROVIDER === "command") {
+    if (env.NODE_ENV === "production" && !env.ALLOW_COMMAND_REVIEW_PROVIDER) {
+      throw new AppError("CONFIGURATION_ERROR", "Command review provider is disabled in production.");
+    }
+    if (!env.COMMAND_AI_BIN) {
+      throw new AppError("CONFIGURATION_ERROR", "COMMAND_AI_BIN is required for the command review provider.");
+    }
+    return new CommandReviewProvider(env.COMMAND_AI_BIN, env.COMMAND_AI_ARGS, env.COMMAND_AI_TIMEOUT_MS);
   }
 
   return mockDesignReviewProvider;
