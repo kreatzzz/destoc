@@ -1,14 +1,14 @@
 "use client";
 
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { Loader2 } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 
 import { AnimatedArrowUpIcon, AnimatedXIcon } from "@/components/ui/animated-icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { WorkspaceChatMessage, WorkspaceSelectedElement } from "./types";
+import type { WorkspaceChatMessage, WorkspaceSelectedElement, WorkspaceSuggestion } from "./types";
 
 interface WorkspaceChatProps {
   width: number;
@@ -16,11 +16,15 @@ interface WorkspaceChatProps {
   selectedElements: WorkspaceSelectedElement[];
   activeSelectionSelector: string | null;
   messages: WorkspaceChatMessage[];
+  suggestions: WorkspaceSuggestion[];
   prompt: string;
   isAuditPending: boolean;
   auditError: string | null;
+  pendingSuggestionId: string | null;
   onPromptChange: (value: string) => void;
   onSendPrompt: () => void;
+  onAcceptSuggestion: (suggestionId: string) => void;
+  onRejectSuggestion: (suggestionId: string) => void;
   onRemoveSelection: (selector: string) => void;
   onActiveSelectionChange: (selector: string) => void;
   onSelectionNoteChange: (selector: string, note: string) => void;
@@ -47,11 +51,15 @@ export function WorkspaceChat({
   selectedElements,
   activeSelectionSelector,
   messages,
+  suggestions,
   prompt,
   isAuditPending,
   auditError,
+  pendingSuggestionId,
   onPromptChange,
   onSendPrompt,
+  onAcceptSuggestion,
+  onRejectSuggestion,
   onRemoveSelection,
   onActiveSelectionChange,
   onSelectionNoteChange,
@@ -66,6 +74,7 @@ export function WorkspaceChat({
   const activeSelectionNumber = activeSelection
     ? selectedElements.findIndex((element) => element.selector === activeSelection.selector) + 1
     : 0;
+  const changeSuggestions = suggestions.filter((suggestion) => suggestion.patch?.trim());
 
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -110,6 +119,54 @@ export function WorkspaceChat({
             {message.content}
           </div>
         ))}
+        {changeSuggestions.map((suggestion) => {
+          const isPending = pendingSuggestionId === suggestion.id;
+          const isAccepted = suggestion.status === "accepted";
+          const isRejected = suggestion.status === "rejected";
+
+          return (
+            <article
+              key={suggestion.id}
+              className="mr-4 rounded-2xl bg-white/[0.045] p-3 text-sm text-zinc-300 shadow-[0_14px_40px_rgba(0,0,0,0.18),inset_0_0_0_1px_rgba(255,255,255,0.07)]"
+            >
+              <div className="flex items-start gap-3">
+                <span className={cn(
+                  "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums",
+                  isAccepted ? "bg-emerald-400/15 text-emerald-200" : isRejected ? "bg-zinc-700 text-zinc-400" : "bg-[#f7ca58] text-[#1b1205]",
+                )}>
+                  {isAccepted ? <Check className="size-3.5" /> : changeSuggestions.findIndex((candidate) => candidate.id === suggestion.id) + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium leading-5 text-zinc-100">{suggestion.title}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">{suggestion.summary}</p>
+                  <p className="mt-2 text-[11px] text-zinc-600">{suggestion.impact} · {suggestion.status}</p>
+                </div>
+              </div>
+
+              {suggestion.status === "pending" ? (
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={isPending}
+                    onClick={() => onRejectSuggestion(suggestion.id)}
+                    className="h-8 px-3 text-zinc-400 transition-[color,background-color,scale] duration-150 active:scale-[0.96] hover:text-zinc-100"
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onAcceptSuggestion(suggestion.id)}
+                    className="h-8 bg-[#f7ca58] px-3 text-[#1b1205] transition-[background-color,scale] duration-150 active:scale-[0.96] hover:bg-[#ffd879]"
+                  >
+                    {isPending ? "Applying…" : "Accept"}
+                  </Button>
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
         {isAuditPending ? (
           <div className="mr-8 inline-flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-2.5 text-sm leading-6 text-zinc-300">
             <span className="text-zinc-500">Drafting code</span>

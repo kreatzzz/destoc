@@ -28,6 +28,14 @@ type ReviewSuggestionPayload = {
   verificationChecklist?: unknown;
 };
 
+type RevisionPayload = {
+  id: string;
+  projectId: string;
+  sandboxRunId?: string | null;
+  patch: string;
+  sandboxRun?: SandboxRunPayload | null;
+};
+
 const defaultData: WorkspaceData = {
   project: { id: "objects", name: "Objects collection", repository: "miloh/objects", branch: "main", updatedAt: "Just now", revisionCount: 4 },
   revisions: [],
@@ -172,7 +180,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     setIsPreviewStarting(true);
 
     for (let attempt = 0; attempt < 180; attempt += 1) {
-      if (activeRunRef.current !== runId) return;
+      if (activeRunRef.current !== runId) return false;
 
       const response = await fetch(`/api/projects/${data.project.id}/sandbox-runs/${runId}`, { cache: "no-store" });
       const payload = await response.json().catch(() => null) as { sandboxRun?: SandboxRunPayload; error?: { message?: string } } | null;
@@ -180,7 +188,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       if (!response.ok || !payload?.sandboxRun) {
         setPreviewError(payload?.error?.message ?? "Could not read sandbox progress.");
         setIsPreviewStarting(false);
-        return;
+        return false;
       }
 
       applyRunState(payload.sandboxRun);
@@ -189,7 +197,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
         setPreviewUrl(payload.sandboxRun.previewUrl);
         setIsPreviewStarting(false);
         router.refresh();
-        return;
+        return true;
       }
 
       if (payload.sandboxRun.status === "FAILED" || payload.sandboxRun.status === "STOPPED") {
@@ -197,7 +205,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
         setPreviewError(payload.sandboxRun.errorMessage ?? "Sandbox preview could not start.");
         setIsPreviewStarting(false);
         router.refresh();
-        return;
+        return false;
       }
 
       await wait(1_500);
@@ -205,6 +213,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
     setPreviewError("Sandbox startup is still running. Refresh the project to continue watching progress.");
     setIsPreviewStarting(false);
+    return false;
   }, [applyRunState, data.project.id, router]);
 
   const startPreview = useCallback(async () => {
@@ -402,14 +411,14 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
       const nextSuggestions = reviewPayload?.review?.suggestions?.map(mapReviewSuggestion) ?? [];
       setSuggestions(nextSuggestions);
-      setCodePaneOpen(true);
       const hasPatch = nextSuggestions.some((suggestion) => suggestion.patch?.trim());
+      setCodePaneOpen(hasPatch);
       setMessages((current) => [...current, {
         id: crypto.randomUUID(),
         role: "assistant",
         content: hasPatch
-          ? "I drafted code changes and opened the code pane."
-          : "I could not draft a safe diff yet. Open the code pane for the source context result.",
+          ? "I drafted a code change. Review the card below; the diff is in the code pane."
+          : "I could not draft a safe diff yet. Try selecting a more specific component or adding a more direct note.",
       }]);
       router.refresh();
     } catch (error) {
@@ -427,7 +436,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
     try {
       const response = await fetch(`/api/suggestions/${suggestionId}/accept`, { method: "POST" });
-      const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+      const payload = await response.json().catch(() => null) as { revision?: RevisionPayload; error?: { message?: string } } | null;
       if (!response.ok) throw new Error(payload?.error?.message ?? "Could not accept this patch.");
 
       setSuggestions((current) => current.map((suggestion) => (
@@ -436,8 +445,21 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       setMessages((current) => [...current, {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: "Patch accepted and a revision was queued. The next step is wiring the revision worker so accepted patches rebuild into a fresh sandbox preview.",
+        content: "Accepted. I’m applying it in a fresh preview now.",
       }]);
+      if (payload?.revision?.sandboxRun) {
+        setPreviewUrl(undefined);
+        applyRunState(payload.revision.sandboxRun);
+        void pollSandboxRun(payload.revision.sandboxRun.id).then((ready) => {
+          if (ready) {
+            setMessages((current) => [...current, {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: "Patched preview is live.",
+            }]);
+          }
+        });
+      }
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not accept this patch.";
@@ -506,11 +528,15 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           selectedElements={selectedElements}
           activeSelectionSelector={activeSelectionSelector}
           messages={messages}
+          suggestions={suggestions}
           prompt={prompt}
           isAuditPending={isAuditPending}
           auditError={auditError}
+          pendingSuggestionId={pendingSuggestionId}
           onPromptChange={setPrompt}
           onSendPrompt={() => void sendPrompt()}
+          onAcceptSuggestion={(suggestionId) => void acceptSuggestion(suggestionId)}
+          onRejectSuggestion={(suggestionId) => void rejectSuggestion(suggestionId)}
           onRemoveSelection={removeSelectedElement}
           onActiveSelectionChange={setActiveSelectionSelector}
           onSelectionNoteChange={updateSelectedElementNote}
@@ -534,9 +560,6 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
             width={codePaneWidth}
             onWidthChange={setCodePaneWidth}
             suggestions={suggestions}
-            pendingSuggestionId={pendingSuggestionId}
-            onAcceptSuggestion={(suggestionId) => void acceptSuggestion(suggestionId)}
-            onRejectSuggestion={(suggestionId) => void rejectSuggestion(suggestionId)}
             onClose={() => setCodePaneOpen(false)}
           />
         </div>

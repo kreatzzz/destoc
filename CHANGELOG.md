@@ -48,6 +48,7 @@ All notable project decisions and changes are recorded here.
 - Workspace chat and code-diff panes are now horizontally resizable, and the code pane opens/closes with an interruptible width/opacity transition while the center sandbox preview flexes responsively.
 - Added Coolify-friendly Docker deployment support with standalone Next.js output, startup Prisma migrations, a container health endpoint, `.dockerignore`, and a deployment runbook.
 - Production rate limiting now supports an explicit single-instance home-server fallback via `ALLOW_IN_MEMORY_RATE_LIMIT`; Upstash remains the recommended distributed limiter.
+- Suggestion decisions now live in compact chat cards while the code pane shows only diffs; accepting a suggestion applies its patch in a fresh sandbox run and automatically switches the preview when ready.
 
 ### Deferred
 

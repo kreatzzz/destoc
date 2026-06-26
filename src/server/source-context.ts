@@ -141,11 +141,12 @@ function inferReplacement(note: string | undefined, currentText: string | undefi
   return null;
 }
 
-function linePatch(path: string, oldLine: string, newLine: string) {
+function linePatch(path: string, lineIndex: number, oldLine: string, newLine: string) {
+  const lineNumber = lineIndex + 1;
   return [
     `--- a/${path}`,
     `+++ b/${path}`,
-    "@@",
+    `@@ -${lineNumber},1 +${lineNumber},1 @@`,
     `-${oldLine}`,
     `+${newLine}`,
   ].join("\n");
@@ -172,7 +173,7 @@ export function inferSimpleTextReplacementPatch(
       if (oldLine === newLine) continue;
 
       return {
-        patch: linePatch(candidate.path, oldLine, newLine),
+        patch: linePatch(candidate.path, lineIndex, oldLine, newLine),
         title: `Rename “${currentText}” to “${replacement}”`,
         issue: `The selected copy reads “${currentText}”; the prompt asks to rename it to “${replacement}”.`,
         intendedOutcome: `Update the rendered copy to “${replacement}”.`,

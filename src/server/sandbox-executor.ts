@@ -4,6 +4,7 @@ import { requireProjectOwnership } from "@/server/authorization";
 import { createPreviewBridgeProxyScript } from "@/server/preview-bridge";
 import { getSandboxCredentials } from "@/server/sandbox-credentials";
 import { transitionSandboxRun, updateSandboxRunProgress } from "@/server/sandbox-runs";
+import { transitionRevision } from "@/server/revisions";
 
 // A preview is interactive product work, not a short command. Keep it alive
 // for the maximum Hobby-safe window so a reviewer is not interrupted mid-audit.
@@ -168,6 +169,39 @@ async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
   return proxy.url;
 }
 
+async function applyPatchToSandbox(sandbox: Sandbox, patch: string): Promise<string> {
+  const patchPath = `${sandbox.cwd}/.destoc.patch`;
+  await sandbox.fs.writeFile(patchPath, patch, "utf8");
+
+  const apply = await sandbox.runCommand({
+    cmd: "git",
+    args: ["apply", "--check", patchPath],
+    cwd: sandbox.cwd,
+    timeoutMs: 15_000,
+  });
+  const checkLog = await commandLog(apply);
+  if (apply.exitCode !== 0) {
+    throw new AppError("VALIDATION_ERROR", "Accepted patch could not be applied cleanly.", {
+      cause: checkLog,
+    });
+  }
+
+  const commit = await sandbox.runCommand({
+    cmd: "git",
+    args: ["apply", patchPath],
+    cwd: sandbox.cwd,
+    timeoutMs: 15_000,
+  });
+  const applyLog = await commandLog(commit);
+  if (commit.exitCode !== 0) {
+    throw new AppError("VALIDATION_ERROR", "Accepted patch failed while applying.", {
+      cause: applyLog,
+    });
+  }
+
+  return truncateLog([checkLog, applyLog].filter(Boolean).join("\n") || "Patch applied cleanly.");
+}
+
 /**
  * Provisions and starts a public repository in an isolated Vercel Sandbox.
  *
@@ -179,7 +213,7 @@ async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
  */
 export async function executeSandboxRun(
   userId: string,
-  input: { sandboxRunId: string; projectId: string; commitSha?: string },
+  input: { sandboxRunId: string; projectId: string; commitSha?: string; patch?: string; revisionId?: string },
 ) {
   const project = await requireProjectOwnership(input.projectId, userId);
   let logs = "";
@@ -188,6 +222,9 @@ export async function executeSandboxRun(
   try {
     const credentials = getSandboxCredentials();
     await transitionSandboxRun(userId, input.sandboxRunId, "PROVISIONING");
+    if (input.revisionId) {
+      await transitionRevision(userId, input.revisionId, "APPLYING");
+    }
 
     sandbox = await Sandbox.create({
       ...credentials,
@@ -211,9 +248,8 @@ export async function executeSandboxRun(
       },
     });
 
-    await transitionSandboxRun(userId, input.sandboxRunId, "BUILDING", {
-      logs: `Provisioned sandbox ${sandbox.name}. Inspecting project manifest.`,
-    });
+    logs = `Provisioned sandbox ${sandbox.name}. Inspecting project manifest.`;
+    await transitionSandboxRun(userId, input.sandboxRunId, "BUILDING", { logs });
 
     const scripts = await packageScripts(sandbox);
     const nextProject = await isNextProject(sandbox);
@@ -231,7 +267,15 @@ export async function executeSandboxRun(
       );
     }
 
-    logs = `Provisioned sandbox ${sandbox.name}. Installing project dependencies.`;
+    if (input.patch) {
+      logs = appendLog(logs || `Provisioned sandbox ${sandbox.name}.`, "Applying accepted patch.");
+      await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+      const patchLog = await applyPatchToSandbox(sandbox, input.patch);
+      logs = appendLog(logs, `Patch apply result:\n${patchLog}`);
+      await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+    }
+
+    logs = appendLog(logs, "Installing project dependencies.");
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
     const install = await sandbox.runCommand({
       cmd: "sh",
@@ -249,7 +293,7 @@ export async function executeSandboxRun(
       timeoutMs: INSTALL_TIMEOUT_MS,
     });
     const installLog = await commandLog(install);
-    logs = truncateLog(`Provisioned sandbox ${sandbox.name}.\n${installLog}`);
+    logs = appendLog(logs, installLog);
 
     if (install.exitCode !== 0) {
       throw new AppError("INTERNAL_ERROR", "Sandbox dependency installation failed.", {
@@ -313,10 +357,15 @@ export async function executeSandboxRun(
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
     const previewUrl = await startPreviewBridge(sandbox, upstreamPort);
 
-    return transitionSandboxRun(userId, input.sandboxRunId, "READY", {
+    const readyRun = await transitionSandboxRun(userId, input.sandboxRunId, "READY", {
       previewUrl,
       logs: appendLog(logs, `Preview bridge ready at ${previewUrl} (upstream port ${upstreamPort})`),
     });
+    if (input.revisionId) {
+      await transitionRevision(userId, input.revisionId, "READY");
+    }
+
+    return readyRun;
   } catch (error) {
     const appError = asAppError(error);
     const errorCode = appError.code === "INTERNAL_ERROR" ? "SANDBOX_EXECUTION_FAILED" : appError.code;
@@ -336,6 +385,17 @@ export async function executeSandboxRun(
       // Preserve the original failure for the response; a concurrent worker may
       // have moved the run to a terminal state first.
       console.error("Failed to persist sandbox failure", transitionError);
+    }
+
+    if (input.revisionId) {
+      try {
+        await transitionRevision(userId, input.revisionId, "FAILED", {
+          errorCode,
+          errorMessage,
+        });
+      } catch (transitionError) {
+        console.error("Failed to persist revision failure", transitionError);
+      }
     }
 
     if (sandbox) {
