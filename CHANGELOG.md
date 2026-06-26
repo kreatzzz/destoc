@@ -41,6 +41,7 @@ All notable project decisions and changes are recorded here.
 - The workspace index now uses a minimal colored/padded project count strip and removes extra explanatory copy.
 - The command review provider example now pins Destoc to `gpt-5.4` with medium reasoning, and workspace chat surfaces use concentric rounding.
 - Fixed the local command review provider config for the current Codex CLI, captured Codex final output via `--output-last-message`, and wired selected component notes into review prompts including notes-only sends.
+- Review prompts now request implementation-first suggestions with optional unified diffs, include repository evidence, and render patch-aware accept/reject cards in the workspace chat.
 
 ### Deferred
 

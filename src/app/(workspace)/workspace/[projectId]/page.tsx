@@ -12,6 +12,11 @@ function toSuggestionStatus(status: string): ReviewStatus {
   return "pending";
 }
 
+function toChecklist(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
 export default async function ProjectWorkspacePage({ params }: { params: Promise<{ projectId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return null;
@@ -46,6 +51,8 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
       rationale: suggestion.rationale,
       impact: suggestion.severity === "high" ? "High impact" : suggestion.severity === "medium" ? "Medium impact" : "Low impact",
       status: toSuggestionStatus(suggestion.status),
+      patch: suggestion.patch,
+      verificationChecklist: toChecklist(suggestion.verificationChecklist),
     })),
     preview: latestSandboxRun
       ? {

@@ -24,6 +24,8 @@ export interface WorkspaceSuggestion {
   rationale: string;
   impact: "High impact" | "Medium impact" | "Low impact";
   status: ReviewStatus;
+  patch?: string | null;
+  verificationChecklist?: string[];
 }
 
 export interface WorkspacePreview {

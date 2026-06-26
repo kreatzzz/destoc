@@ -49,6 +49,24 @@ function componentPatch(sourceFilePath: string | undefined): string | undefined 
   ].join("\n");
 }
 
+const reviewJsonShape = "{\"summary\":\"string\",\"suggestions\":[{\"severity\":\"low|medium|high\",\"confidence\":0.8,\"title\":\"string\",\"issue\":\"string\",\"rationale\":\"string\",\"intendedOutcome\":\"string\",\"patch\":\"optional unified diff\",\"verificationChecklist\":[\"string\"]}]}";
+
+const implementationGuidance = [
+  "If the user asks to implement, rewrite, optimize, or change a selected component, do not stop at advice.",
+  "Return a concrete implementation suggestion.",
+  "When you can identify a safe source file, include a unified diff in suggestion.patch using --- a/path and +++ b/path headers.",
+  "Only propose patches under src/app, src/components, or CSS files.",
+  "If the source file cannot be inferred from the supplied evidence, do not hallucinate that it was applied; put the exact replacement copy/code in intendedOutcome and explain the missing source-file constraint in issue.",
+].join(" ");
+
+function providerRequestPayload(request: DesignReviewRequest) {
+  return {
+    scope: request.scope,
+    prompt: request.prompt,
+    evidence: request.evidence,
+  };
+}
+
 /**
  * A deterministic provider used until a live DeepSeek integration is configured.
  * It intentionally only speaks about supplied evidence so the UI cannot present
@@ -135,18 +153,15 @@ class LocalOpenAICompatibleProvider implements DesignReviewProvider {
             content: [
               "You are Destoc's design-review provider.",
               "Return only JSON matching this shape:",
-              "{\"summary\":\"string\",\"suggestions\":[{\"severity\":\"low|medium|high\",\"confidence\":0.8,\"title\":\"string\",\"issue\":\"string\",\"rationale\":\"string\",\"intendedOutcome\":\"string\",\"verificationChecklist\":[\"string\"]}]}",
+              reviewJsonShape,
               "Keep suggestions practical, visual, and based only on the supplied evidence.",
+              implementationGuidance,
               "Do not include markdown fences.",
             ].join(" "),
           },
           {
             role: "user",
-            content: JSON.stringify({
-              scope: request.scope,
-              prompt: request.prompt,
-              evidence: request.evidence,
-            }),
+            content: JSON.stringify(providerRequestPayload(request)),
           },
         ],
       }),
@@ -188,15 +203,12 @@ class CommandReviewProvider implements DesignReviewProvider {
       "You are Destoc's design-review provider.",
       "Return only valid JSON. Do not include markdown fences or commentary.",
       "The JSON must match this shape:",
-      "{\"summary\":\"string\",\"suggestions\":[{\"severity\":\"low|medium|high\",\"confidence\":0.8,\"title\":\"string\",\"issue\":\"string\",\"rationale\":\"string\",\"intendedOutcome\":\"string\",\"verificationChecklist\":[\"string\"]}]}",
+      reviewJsonShape,
       "Keep suggestions practical, visual, and based only on the supplied evidence.",
+      implementationGuidance,
       "",
       "Request:",
-      JSON.stringify({
-        scope: request.scope,
-        prompt: request.prompt,
-        evidence: request.evidence,
-      }),
+      JSON.stringify(providerRequestPayload(request)),
     ].join("\n");
   }
 

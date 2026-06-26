@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { WorkspaceHeader } from "@/components/app-shell/workspace-header";
 import { CanvasPreview } from "./canvas-preview";
 import { WorkspaceChat } from "./workspace-chat";
-import type { WorkspaceChatMessage, WorkspaceData, WorkspacePreview, WorkspaceSelectedElement } from "./types";
+import type { WorkspaceChatMessage, WorkspaceData, WorkspacePreview, WorkspaceSelectedElement, WorkspaceSuggestion } from "./types";
 
 type SandboxRunPayload = {
   id: string;
@@ -14,6 +14,17 @@ type SandboxRunPayload = {
   previewUrl?: string | null;
   logs?: string | null;
   errorMessage?: string | null;
+};
+
+type ReviewSuggestionPayload = {
+  id: string;
+  title: string;
+  issue: string;
+  rationale: string;
+  severity: string;
+  status?: string;
+  patch?: string | null;
+  verificationChecklist?: unknown;
 };
 
 const defaultData: WorkspaceData = {
@@ -90,6 +101,21 @@ function buildReviewPrompt(prompt: string, selectedElementNotes: string[]) {
   ].filter(Boolean).join("\n\n");
 }
 
+function mapReviewSuggestion(suggestion: ReviewSuggestionPayload): WorkspaceSuggestion {
+  return {
+    id: suggestion.id,
+    title: suggestion.title,
+    summary: suggestion.issue,
+    rationale: suggestion.rationale,
+    impact: suggestion.severity === "high" ? "High impact" : suggestion.severity === "medium" ? "Medium impact" : "Low impact",
+    status: suggestion.status === "ACCEPTED" ? "accepted" : suggestion.status === "REJECTED" ? "rejected" : "pending",
+    patch: suggestion.patch,
+    verificationChecklist: Array.isArray(suggestion.verificationChecklist)
+      ? suggestion.verificationChecklist.filter((item): item is string => typeof item === "string")
+      : [],
+  };
+}
+
 export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const router = useRouter();
   const [designMode, setDesignMode] = useState(false);
@@ -100,6 +126,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const [previewError, setPreviewError] = useState<string | null>(data.preview?.errorMessage ?? null);
   const [isPreviewStarting, setIsPreviewStarting] = useState(activeSandboxStatuses.has(data.preview?.status));
   const [selectedElements, setSelectedElements] = useState<WorkspaceSelectedElement[]>([]);
+  const [suggestions, setSuggestions] = useState<WorkspaceSuggestion[]>(data.suggestions);
   const [activeSelectionSelector, setActiveSelectionSelector] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<WorkspaceChatMessage[]>([
@@ -111,6 +138,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   ]);
   const [isAuditPending, setIsAuditPending] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [pendingSuggestionId, setPendingSuggestionId] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const activeRunRef = useRef<string | undefined>(data.preview?.runId);
   const startingRef = useRef(false);
@@ -322,11 +350,13 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
         }),
       });
       const reviewPayload = await reviewResponse.json().catch(() => null) as {
-        review?: { result?: { summary?: string }; suggestions?: Array<{ title?: string }> };
+        review?: { result?: { summary?: string }; suggestions?: ReviewSuggestionPayload[] };
         error?: { message?: string };
       } | null;
       if (!reviewResponse.ok) throw new Error(reviewPayload?.error?.message ?? "Could not run the design review.");
 
+      const nextSuggestions = reviewPayload?.review?.suggestions?.map(mapReviewSuggestion) ?? [];
+      setSuggestions(nextSuggestions);
       const summary = reviewPayload?.review?.result?.summary
         ?? reviewPayload?.review?.suggestions?.[0]?.title
         ?? "I created a new design review from your selected context.";
@@ -338,6 +368,57 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: message }]);
     } finally {
       setIsAuditPending(false);
+    }
+  }
+
+  async function acceptSuggestion(suggestionId: string) {
+    setPendingSuggestionId(suggestionId);
+    setAuditError(null);
+
+    try {
+      const response = await fetch(`/api/suggestions/${suggestionId}/accept`, { method: "POST" });
+      const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+      if (!response.ok) throw new Error(payload?.error?.message ?? "Could not accept this patch.");
+
+      setSuggestions((current) => current.map((suggestion) => (
+        suggestion.id === suggestionId ? { ...suggestion, status: "accepted" } : suggestion
+      )));
+      setMessages((current) => [...current, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "Patch accepted and a revision was queued. The next step is wiring the revision worker so accepted patches rebuild into a fresh sandbox preview.",
+      }]);
+      router.refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not accept this patch.";
+      setAuditError(message);
+    } finally {
+      setPendingSuggestionId(null);
+    }
+  }
+
+  async function rejectSuggestion(suggestionId: string) {
+    setPendingSuggestionId(suggestionId);
+    setAuditError(null);
+
+    try {
+      const response = await fetch(`/api/suggestions/${suggestionId}/reject`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+      if (!response.ok) throw new Error(payload?.error?.message ?? "Could not reject this suggestion.");
+
+      setSuggestions((current) => current.map((suggestion) => (
+        suggestion.id === suggestionId ? { ...suggestion, status: "rejected" } : suggestion
+      )));
+      router.refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not reject this suggestion.";
+      setAuditError(message);
+    } finally {
+      setPendingSuggestionId(null);
     }
   }
 
@@ -366,11 +447,15 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           selectedElements={selectedElements}
           activeSelectionSelector={activeSelectionSelector}
           messages={messages}
+          suggestions={suggestions}
           prompt={prompt}
           isAuditPending={isAuditPending}
           auditError={auditError}
+          pendingSuggestionId={pendingSuggestionId}
           onPromptChange={setPrompt}
           onSendPrompt={() => void sendPrompt()}
+          onAcceptSuggestion={(suggestionId) => void acceptSuggestion(suggestionId)}
+          onRejectSuggestion={(suggestionId) => void rejectSuggestion(suggestionId)}
           onRemoveSelection={removeSelectedElement}
           onActiveSelectionChange={setActiveSelectionSelector}
           onSelectionNoteChange={updateSelectedElementNote}

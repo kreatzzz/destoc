@@ -18,6 +18,12 @@ export type {
 
 export type DesignReviewEvidence = {
   pageUrl: string;
+  repository?: {
+    owner: string;
+    name: string;
+    url: string;
+    defaultBranch: string;
+  };
   sourceFilePath?: string;
   selectedElement?: {
     selector: string;

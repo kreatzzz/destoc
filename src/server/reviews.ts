@@ -59,7 +59,7 @@ export async function runReview(userId: string, input: CreateReviewInput | unkno
 
   const target = await getPrisma().reviewTarget.findFirst({
     where: { id: parsed.reviewTargetId, projectId: parsed.projectId },
-    include: { element: true },
+    include: { element: true, project: true },
   });
   if (!target) throw new AppError("NOT_FOUND", "Review target not found.");
 
@@ -88,6 +88,12 @@ export async function runReview(userId: string, input: CreateReviewInput | unkno
       prompt: parsed.prompt,
       evidence: {
         pageUrl: target.pageUrl,
+        repository: {
+          owner: target.project.repositoryOwner,
+          name: target.project.repositoryName,
+          url: target.project.githubUrl,
+          defaultBranch: target.project.defaultBranch,
+        },
         sourceFilePath: target.sourceFilePath ?? undefined,
         selectedElement: target.element
           ? {
