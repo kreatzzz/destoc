@@ -1,18 +1,18 @@
 import type { Project, ReviewTarget, SelectedElement } from "@/generated/prisma/client";
 
-type SourceCandidate = {
+export type SourceCandidate = {
   path: string;
   content: string;
 };
 
-type SourceContext = {
+export type SourceContext = {
   candidates: SourceCandidate[];
   note: string;
 };
 
-const sourcePathPattern = /^src\/(?:app|components)\/.+\.(?:tsx|jsx|ts|js|css)$/;
-const maxFilesToFetch = 36;
-const maxCandidates = 5;
+const sourcePathPattern = /^(?:src\/)?(?:app|components|data|content|lib)\/.+\.(?:tsx|jsx|ts|js|css|json|mdx?)$/;
+const maxFilesToFetch = 80;
+const maxCandidates = 8;
 const maxContentLength = 18_000;
 const stopWords = new Set([
   "about",
@@ -58,6 +58,17 @@ function selectedElementsFromContext(domContext: unknown): Array<{ text?: string
     }));
 }
 
+function selectedElementsForReplacement(target: ReviewTarget & { element: SelectedElement | null }) {
+  const selectedElements = selectedElementsFromContext(target.domContext);
+  if (target.element) {
+    selectedElements.unshift({
+      text: target.element.text ?? undefined,
+      role: target.element.role ?? undefined,
+    });
+  }
+  return selectedElements;
+}
+
 function wordsFrom(value: string | undefined) {
   return (value ?? "")
     .toLowerCase()
@@ -92,9 +103,84 @@ function pathScore(path: string) {
   if (/\/page\.(tsx|jsx)$/.test(path)) score += 18;
   if (/\/layout\.(tsx|jsx)$/.test(path)) score += 8;
   if (/\/components?\//.test(path)) score += 8;
+  if (/\/data\//.test(path)) score += 12;
+  if (/\/content\//.test(path)) score += 10;
   if (/\.(css)$/.test(path)) score += 5;
   if (/node_modules|dist|build|\.next/.test(path)) score -= 100;
   return score;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function capitalizeLikeSource(source: string, replacement: string) {
+  if (!source || !replacement) return replacement;
+  if (source[0] === source[0]?.toUpperCase()) {
+    return replacement[0]?.toUpperCase() + replacement.slice(1);
+  }
+  return replacement;
+}
+
+function inferReplacement(note: string | undefined, currentText: string | undefined) {
+  if (!note?.trim() || !currentText?.trim()) return null;
+  const cleanNote = note.trim().replace(/\s+/g, " ");
+  const patterns = [
+    /\b(?:rename|change|replace|update)\b(?:\s+(?:it|this|text|label|link|copy|heading))?\s+(?:to|as)\s+["“]?(.+?)["”]?\.?$/i,
+    /\b(?:make|turn)\b(?:\s+(?:it|this|text|label|link|copy|heading))?\s+(?:to|into)\s+["“]?(.+?)["”]?\.?$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = cleanNote.match(pattern);
+    const replacement = match?.[1]?.trim();
+    if (replacement && replacement.length <= 120) {
+      return capitalizeLikeSource(currentText.trim(), replacement);
+    }
+  }
+
+  return null;
+}
+
+function linePatch(path: string, oldLine: string, newLine: string) {
+  return [
+    `--- a/${path}`,
+    `+++ b/${path}`,
+    "@@",
+    `-${oldLine}`,
+    `+${newLine}`,
+  ].join("\n");
+}
+
+export function inferSimpleTextReplacementPatch(
+  sourceContext: SourceContext,
+  target: ReviewTarget & { element: SelectedElement | null },
+) {
+  const selectedElements = selectedElementsForReplacement(target);
+
+  for (const element of selectedElements) {
+    const currentText = element.text?.trim();
+    const replacement = inferReplacement(element.note, currentText);
+    if (!currentText || !replacement || replacement === currentText) continue;
+
+    for (const candidate of sourceContext.candidates) {
+      const lines = candidate.content.split("\n");
+      const lineIndex = lines.findIndex((line) => line.includes(currentText));
+      if (lineIndex === -1) continue;
+
+      const oldLine = lines[lineIndex];
+      const newLine = oldLine.replace(new RegExp(escapeRegExp(currentText), "g"), replacement);
+      if (oldLine === newLine) continue;
+
+      return {
+        patch: linePatch(candidate.path, oldLine, newLine),
+        title: `Rename “${currentText}” to “${replacement}”`,
+        issue: `The selected copy reads “${currentText}”; the prompt asks to rename it to “${replacement}”.`,
+        intendedOutcome: `Update the rendered copy to “${replacement}”.`,
+      };
+    }
+  }
+
+  return null;
 }
 
 function contentScore(path: string, content: string, exactPhrases: string[], words: string[]) {

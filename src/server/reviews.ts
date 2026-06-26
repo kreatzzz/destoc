@@ -11,7 +11,7 @@ import {
 import { requireProjectOwnership } from "@/server/authorization";
 import { assertPatchIsAllowed } from "@/server/patches";
 import { enforceRateLimit } from "@/server/rate-limit";
-import { sourceContextForReview } from "@/server/source-context";
+import { inferSimpleTextReplacementPatch, sourceContextForReview } from "@/server/source-context";
 
 export async function createReviewTarget(userId: string, input: CreateReviewTargetInput | unknown) {
   await enforceRateLimit("mutation", userId);
@@ -112,6 +112,28 @@ export async function runReview(userId: string, input: CreateReviewInput | unkno
           : undefined,
       },
     });
+    const inferredPatch = result.suggestions.some((suggestion) => suggestion.patch?.trim())
+      ? null
+      : inferSimpleTextReplacementPatch(sourceContext, target);
+
+    if (inferredPatch) {
+      result.suggestions = [
+        {
+          severity: "low",
+          confidence: 0.95,
+          title: inferredPatch.title,
+          issue: inferredPatch.issue,
+          rationale: "This is a direct selected-text replacement found in the fetched source context.",
+          intendedOutcome: inferredPatch.intendedOutcome,
+          patch: inferredPatch.patch,
+          verificationChecklist: [
+            "Confirm the selected text changed in the preview.",
+            "Confirm spacing and link behavior remain unchanged.",
+          ],
+        },
+      ];
+      result.summary = "I drafted a direct source diff for the selected text change.";
+    }
 
     for (const suggestion of result.suggestions) {
       if (suggestion.patch) assertPatchIsAllowed(suggestion.patch, target.sourceFilePath ?? undefined);

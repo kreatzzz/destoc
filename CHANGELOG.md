@@ -44,6 +44,7 @@ All notable project decisions and changes are recorded here.
 - Review prompts now request implementation-first suggestions with optional unified diffs, include repository evidence, and render patch-aware accept/reject cards in the workspace chat.
 - Review generation now fetches bounded public GitHub source candidates so providers can draft real diffs instead of source-missing advice; workspace chat is simplified and code changes live in a collapsible right pane.
 - Workspace top bar now includes restart/stop sandbox controls and a code-changes pane toggle.
+- Added a deterministic selected-text replacement fallback for simple copy edits, made the code pane show code diffs only, added an animated drafting bubble, and clear selected components immediately after prompt submission.
 
 ### Deferred
 

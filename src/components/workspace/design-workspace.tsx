@@ -328,13 +328,17 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
   async function sendPrompt() {
     const trimmedPrompt = prompt.trim();
-    const selectedElementNotes = selectedElementNotesForPrompt(selectedElements);
+    const selectedElementsSnapshot = selectedElements;
+    const activeSelectionSelectorSnapshot = activeSelectionSelector;
+    const selectedElementNotes = selectedElementNotesForPrompt(selectedElementsSnapshot);
     const reviewPrompt = buildReviewPrompt(trimmedPrompt, selectedElementNotes);
     if (!reviewPrompt || isAuditPending) return;
 
     setPrompt("");
     setAuditError(null);
     setIsAuditPending(true);
+    setSelectedElements([]);
+    setActiveSelectionSelector(null);
     const messageId = crypto.randomUUID();
     setMessages((current) => [
       ...current,
@@ -347,8 +351,8 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
 
     try {
       if (!previewUrl) throw new Error("Preview is still starting. Try again when it is live.");
-      const focusedElement = selectedElements.find((element) => element.selector === activeSelectionSelector)
-        ?? selectedElements.at(-1)
+      const focusedElement = selectedElementsSnapshot.find((element) => element.selector === activeSelectionSelectorSnapshot)
+        ?? selectedElementsSnapshot.at(-1)
         ?? null;
       const targetResponse = await fetch("/api/reviews/targets", {
         method: "POST",
@@ -359,7 +363,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
           pageUrl: previewUrl,
           domContext: {
             source: "workspace-chat",
-            selectedElements: selectedElements.map((element) => ({
+            selectedElements: selectedElementsSnapshot.map((element) => ({
               selector: element.selector,
               role: element.role,
               text: element.text,

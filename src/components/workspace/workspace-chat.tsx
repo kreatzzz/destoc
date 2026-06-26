@@ -64,6 +64,16 @@ export function WorkspaceChat({
             {message.content}
           </div>
         ))}
+        {isAuditPending ? (
+          <div className="mr-8 inline-flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-2.5 text-sm leading-6 text-zinc-300">
+            <span className="text-zinc-500">Drafting code</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-160ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-80ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58]" />
+            </span>
+          </div>
+        ) : null}
         {auditError ? <p role="alert" className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">{auditError}</p> : null}
       </div>
 

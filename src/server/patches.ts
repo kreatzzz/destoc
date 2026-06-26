@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/errors";
 
-const allowedUiPath = /^src\/(app|components)\/.+\.(?:tsx|jsx|css)$/;
+const allowedUiPath = /^(?:src\/)?(?:app|components|data|content|lib)\/.+\.(?:tsx|jsx|ts|js|css|json|mdx?)$/;
 const forbiddenPathSegment = /(^|\/)(?:\.git|node_modules|\.env(?:\.|$)|package(?:-lock)?\.json|bun\.lockb?|pnpm-lock\.yaml|yarn\.lock)(?:\/|$)/;
 
 function extractPatchPaths(patch: string): string[] {
