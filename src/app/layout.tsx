@@ -4,6 +4,8 @@ import { Agentation } from "agentation";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
+const showAgentation = process.env.NEXT_PUBLIC_SHOW_AGENTATION === "true";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -32,7 +34,7 @@ export default function RootLayout({
       <body className="min-h-full bg-background font-sans text-foreground antialiased">
         <TooltipProvider>
           {children}
-          {process.env.NODE_ENV === "development" ? <Agentation /> : null}
+          {process.env.NODE_ENV === "development" && showAgentation ? <Agentation /> : null}
         </TooltipProvider>
       </body>
     </html>
