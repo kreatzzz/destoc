@@ -1,6 +1,7 @@
-import { Loader2, PanelRightClose, PanelRightOpen, RotateCcw, Square } from "lucide-react";
+import { Loader2, Square } from "lucide-react";
 
 import { DestocLogo } from "@/components/app-shell/destoc-logo";
+import { AnimatedPanelLeftCloseIcon, AnimatedPanelRightOpenIcon, AnimatedRotateCcwIcon } from "@/components/ui/animated-icons";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { WorkspaceLogoutButton } from "@/components/workspace/workspace-logout-button";
@@ -54,9 +55,9 @@ export function WorkspaceHeader({
               aria-label="Restart sandbox"
               disabled={isPreviewStarting}
               onClick={onRestartSandbox}
-              className="text-zinc-500 hover:bg-white/[0.06] hover:text-[#ffd879]"
+              className="grid place-items-center text-zinc-500 hover:bg-white/[0.06] hover:text-[#ffd879]"
             >
-              <RotateCcw className="size-3.5" />
+              <AnimatedRotateCcwIcon size={14} />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Restart sandbox</TooltipContent>
@@ -74,7 +75,7 @@ export function WorkspaceHeader({
               aria-label="Stop sandbox"
               disabled={!canStopSandbox || isStoppingSandbox}
               onClick={onStopSandbox}
-              className="text-zinc-500 hover:bg-white/[0.06] hover:text-rose-200"
+              className="grid place-items-center text-zinc-500 hover:bg-white/[0.06] hover:text-rose-200"
             >
               {isStoppingSandbox ? <Loader2 className="animate-spin" /> : <Square className="size-3.5" />}
             </Button>
@@ -96,7 +97,9 @@ export function WorkspaceHeader({
                 codePaneOpen && "bg-white/[0.06] text-[#ffd879]",
               )}
             >
-              {codePaneOpen ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
+              <span className="grid size-5 place-items-center">
+                {codePaneOpen ? <AnimatedPanelLeftCloseIcon size={16} /> : <AnimatedPanelRightOpenIcon size={16} />}
+              </span>
               {hasCodeChanges ? <span className="absolute right-1 top-1 size-1.5 rounded-full bg-[#f7ca58]" /> : null}
             </Button>
           </TooltipTrigger>

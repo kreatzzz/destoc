@@ -41,17 +41,21 @@ export default async function WorkspacePage() {
           <WorkspaceLogoutButton />
         </header>
 
-        {!activeWorkspace ? <WorkspaceOnboarding /> : (
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        {!activeWorkspace ? (
+          <WorkspaceOnboarding />
+        ) : (
+          <div className="grid gap-5 rounded-[28px] bg-[#15140f] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.34),inset_0_0_0_1px_rgba(247,202,88,0.10)] lg:grid-cols-[minmax(0,1fr)_360px]">
             <section className="grid content-start gap-5">
-              <div className="bg-[#171715] px-4 py-3">
+              <div className="rounded-2xl bg-[#171715] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.055)]">
                 <Badge variant="outline" className="border-[#f7ca58]/20 bg-[#f7ca58]/10 text-[#f7ca58]">
                   {projectItems.length} connected
                 </Badge>
               </div>
 
-              {projectItems.length ? <ProjectList projects={projectItems} /> : (
-                <div className="border border-dashed border-white/10 bg-white/[0.025] p-10 text-center">
+              {projectItems.length ? (
+                <ProjectList projects={projectItems} />
+              ) : (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.025] p-10 text-center">
                   <AnimatedPlusIcon size={20} className="mx-auto text-[#f7ca58]" />
                   <p className="mt-3 text-sm font-medium text-zinc-100">No connected projects</p>
                   <p className="mt-1 text-sm text-zinc-500">Import a public GitHub repository to begin a focused review.</p>

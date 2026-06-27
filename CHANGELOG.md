@@ -54,6 +54,7 @@ All notable project decisions and changes are recorded here.
 - Suggestion acceptance now marks suggestions as accepted only after the sandbox patch applies successfully; failed patch applications leave suggestions retryable.
 - The project-detail workspace header now uses logout instead of a delete-project icon, matching the workspace index behavior.
 - Workspace chat now uses the new shadcn `MessageScroller`, `Message`, and `Bubble` primitives, adds the related shadcn chat primitives to the UI library, and applies the Mobbin-backed direction of quiet rails, compact cards, and a stronger composer surface.
+- Workspace shell now groups repository content in a warm tinted panel, rounds the connected-project summary, aligns top-bar icons with animated lucide icons, and compacts chat/update surfaces.
 
 ### Deferred
 

@@ -9,7 +9,11 @@ import {
   DeleteIcon,
   EyeIcon,
   FolderOpenIcon,
+  LogoutIcon,
+  PanelLeftCloseIcon,
+  PanelRightOpenIcon,
   PlusIcon,
+  RotateCcwIcon,
   SendIcon,
   XIcon,
   type CursorClickIconHandle,
@@ -59,8 +63,24 @@ export function AnimatedFolderOpenIcon({ className, size = 16, ...props }: Anima
   return <FolderOpenIcon size={size} className={iconClassName(className)} {...props} />;
 }
 
+export function AnimatedLogoutIcon({ className, size = 16, ...props }: AnimatedIconProps) {
+  return <LogoutIcon size={size} className={iconClassName(className)} {...props} />;
+}
+
+export function AnimatedPanelLeftCloseIcon({ className, size = 16, ...props }: AnimatedIconProps) {
+  return <PanelLeftCloseIcon size={size} className={iconClassName(className)} {...props} />;
+}
+
+export function AnimatedPanelRightOpenIcon({ className, size = 16, ...props }: AnimatedIconProps) {
+  return <PanelRightOpenIcon size={size} className={iconClassName(className)} {...props} />;
+}
+
 export function AnimatedPlusIcon({ className, size = 16, ...props }: AnimatedIconProps) {
   return <PlusIcon size={size} className={iconClassName(className)} {...props} />;
+}
+
+export function AnimatedRotateCcwIcon({ className, size = 16, ...props }: AnimatedIconProps) {
+  return <RotateCcwIcon size={size} className={iconClassName(className)} {...props} />;
 }
 
 export function AnimatedSendIcon({ className, size = 16, ...props }: AnimatedIconProps) {

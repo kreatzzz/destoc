@@ -140,7 +140,7 @@ export function WorkspaceChat({
                         <Bubble align={isUser ? "end" : "start"} variant={isUser ? "default" : "muted"} className="max-w-[92%]">
                           <BubbleContent
                             className={cn(
-                              "rounded-[18px] border-0 px-3 py-2 text-sm leading-6 shadow-none",
+                              "rounded-xl border-0 px-3 py-2 text-sm leading-6 shadow-none",
                               isUser
                                 ? "bg-[#f7ca58] text-[#1b1205] shadow-[0_8px_22px_rgba(247,202,88,0.10)]"
                                 : "bg-white/[0.026] text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]",
@@ -164,7 +164,7 @@ export function WorkspaceChat({
                     <Message align="start">
                       <MessageContent>
                         <Bubble variant="muted" className="max-w-[94%]">
-                          <BubbleContent className="rounded-[22px] border-0 bg-[#171715] p-3 text-sm text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+                          <BubbleContent className="rounded-2xl border-0 bg-[#171715] p-3 text-sm text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
                             <div className="flex items-start gap-3">
                               <span className={cn(
                                 "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tabular-nums",
@@ -175,7 +175,6 @@ export function WorkspaceChat({
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium leading-5 text-zinc-100 text-pretty">{suggestion.title}</p>
                                 <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500 text-pretty">{suggestion.summary}</p>
-                                <p className="mt-2 text-[11px] text-zinc-600">{suggestion.impact} · {suggestion.status}</p>
                               </div>
                             </div>
 
@@ -212,7 +211,7 @@ export function WorkspaceChat({
                   <Message align="start">
                     <MessageContent>
                       <Bubble variant="muted" className="max-w-[92%]">
-                        <BubbleContent className="rounded-full border-0 bg-white/[0.035] px-3 py-2 text-sm leading-6 text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]">
+                        <BubbleContent className="rounded-xl border-0 bg-white/[0.035] px-3 py-2 text-sm leading-6 text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]">
                           <span className="inline-flex items-center gap-2">
                             <span className="text-zinc-500">Drafting code</span>
                             <span className="inline-flex items-center gap-1">
@@ -287,7 +286,7 @@ export function WorkspaceChat({
           )}
         </div>
         {activeSelection ? (
-          <div className="mb-2 rounded-[22px] bg-white/[0.028] p-2.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.045)]">
+          <div className="mb-2 rounded-2xl bg-white/[0.028] p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.045)]">
             <div className="mb-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-zinc-500">
               <span className="truncate">
                 Note for <span className="font-mono tabular-nums text-[#f7ca58]">#{activeSelectionNumber}</span> {elementLabel(activeSelection)}
@@ -298,11 +297,11 @@ export function WorkspaceChat({
               value={activeSelection.note ?? ""}
               onChange={(event) => onSelectionNoteChange(activeSelection.id, event.target.value)}
               placeholder="Add what should change or what to review here…"
-              className="max-h-24 min-h-16 resize-none rounded-2xl border-0 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-1 focus-visible:ring-[#f7ca58]/20"
+              className="max-h-24 min-h-14 resize-none rounded-xl border-0 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-1 focus-visible:ring-[#f7ca58]/20"
             />
           </div>
         ) : null}
-        <div className="rounded-[26px] bg-[#171715] p-2.5 shadow-[0_18px_50px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(255,255,255,0.075)]">
+        <div className="rounded-2xl bg-[#171715] p-2 shadow-[0_18px_50px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(255,255,255,0.075)]">
           <Textarea
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}
@@ -313,7 +312,7 @@ export function WorkspaceChat({
               }
             }}
             placeholder={hasSelectedElementNotes ? "Optional: add extra direction for these notes…" : "Ask for a design audit or targeted improvement…"}
-            className="max-h-40 min-h-20 resize-none rounded-[18px] border-0 bg-transparent px-2.5 py-2 text-sm leading-6 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
+            className="max-h-36 min-h-16 resize-none rounded-xl border-0 bg-transparent px-2.5 py-1.5 text-sm leading-6 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
           />
           <div className="flex items-center justify-between px-1 pt-1">
             <p className="text-[10px] text-zinc-600">⌘ Enter to send</p>
