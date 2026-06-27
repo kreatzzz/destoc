@@ -154,7 +154,9 @@ Use shadcn chat primitives (`MessageScroller`, `Message`, and `Bubble`) as the d
 
 **Selected component pills:** show the number first, then role/name. If overflow occurs, show a final `+N` pill. Notes belong directly above the composer and should not shift the whole layout dramatically.
 
-**Suggestion card:** decisions live in chat. The card shows title, short rationale, and Accept/Reject. It avoids secondary status copy such as impact labels when the action state is already clear from the controls.
+**Suggestion card:** pending decisions live in chat. The card shows title, short rationale, and Accept/Reject. Accepted cards are removed from the action stream and replaced by concise streamed assistant status text so the chat does not accumulate checkmark confirmations.
+
+**Message hierarchy:** user messages are right-aligned gold command bubbles with a small `You` label. Agent messages are left-aligned muted cards with a `Destoc` label and a subtle gold rail. The two roles must be visually distinguishable at a glance.
 
 **Code pane:** diff-only. No accept/reject controls, no rationale blocks, no implementation prose. Opening is user-controlled.
 

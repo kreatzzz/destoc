@@ -1,7 +1,7 @@
 "use client";
 
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { AnimatedArrowUpIcon, AnimatedXIcon } from "@/components/ui/animated-icons";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -87,7 +87,7 @@ export function WorkspaceChat({
   const activeSelectionNumber = activeSelection
     ? selectedElements.findIndex((element) => element.id === activeSelection.id) + 1
     : 0;
-  const changeSuggestions = suggestions.filter((suggestion) => suggestion.patch?.trim());
+  const changeSuggestions = suggestions.filter((suggestion) => suggestion.patch?.trim() && suggestion.status === "pending");
 
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -137,15 +137,21 @@ export function WorkspaceChat({
                   <MessageScrollerItem key={chatMessage.id}>
                     <Message align={isUser ? "end" : "start"}>
                       <MessageContent>
-                        <Bubble align={isUser ? "end" : "start"} variant={isUser ? "default" : "muted"} className="max-w-[92%]">
+                        <Bubble align={isUser ? "end" : "start"} variant={isUser ? "default" : "muted"} className={cn("max-w-[92%]", isUser ? "ml-auto" : "mr-auto")}>
                           <BubbleContent
                             className={cn(
-                              "rounded-xl border-0 px-3 py-2 text-sm leading-6 shadow-none",
+                              "border-0 px-3 py-2 text-sm leading-6 shadow-none",
                               isUser
-                                ? "bg-[#f7ca58] text-[#1b1205] shadow-[0_8px_22px_rgba(247,202,88,0.10)]"
-                                : "bg-white/[0.026] text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]",
+                                ? "rounded-[16px_16px_4px_16px] bg-[#f7ca58] text-[#1b1205] shadow-[0_8px_22px_rgba(247,202,88,0.10)]"
+                                : "rounded-[16px_16px_16px_4px] bg-white/[0.035] text-zinc-300 shadow-[inset_3px_0_0_rgba(247,202,88,0.52),inset_0_0_0_1px_rgba(255,255,255,0.035)]",
                             )}
                           >
+                            <span className={cn(
+                              "mb-1 block text-[10px] font-medium uppercase tracking-[0.16em]",
+                              isUser ? "text-[#5f4210]" : "text-[#f7ca58]",
+                            )}>
+                              {isUser ? "You" : "Destoc"}
+                            </span>
                             <p className="whitespace-pre-wrap text-pretty">{chatMessage.content}</p>
                           </BubbleContent>
                         </Bubble>
@@ -156,8 +162,6 @@ export function WorkspaceChat({
               })}
               {changeSuggestions.map((suggestion) => {
                 const isPending = pendingSuggestionId === suggestion.id;
-                const isAccepted = suggestion.status === "accepted";
-                const isRejected = suggestion.status === "rejected";
 
                 return (
                   <MessageScrollerItem key={suggestion.id}>
@@ -168,9 +172,9 @@ export function WorkspaceChat({
                             <div className="flex items-start gap-3">
                               <span className={cn(
                                 "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tabular-nums",
-                                isAccepted ? "bg-emerald-400/15 text-emerald-200" : isRejected ? "bg-zinc-700 text-zinc-400" : "bg-[#f7ca58] text-[#1b1205]",
+                                "bg-[#f7ca58] text-[#1b1205]",
                               )}>
-                                {isAccepted ? <Check className="size-3.5" /> : changeSuggestions.findIndex((candidate) => candidate.id === suggestion.id) + 1}
+                                {changeSuggestions.findIndex((candidate) => candidate.id === suggestion.id) + 1}
                               </span>
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium leading-5 text-zinc-100 text-pretty">{suggestion.title}</p>

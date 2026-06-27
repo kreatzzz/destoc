@@ -43,6 +43,46 @@ async function verifyPublicGitHubRepository(owner: string, repository: string, b
   if (!branchResponse.ok) {
     throw new AppError("VALIDATION_ERROR", `GitHub could not verify this branch right now (HTTP ${branchResponse.status}).`);
   }
+
+  const packageResponse = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/contents/package.json?ref=${encodeURIComponent(branch)}`, {
+    headers: { accept: "application/vnd.github+json", "user-agent": "destoc-repository-import" },
+    signal: AbortSignal.timeout(8_000),
+  }).catch(() => null);
+
+  if (!packageResponse) {
+    throw new AppError("VALIDATION_ERROR", "Could not inspect this repository for preview compatibility. Try again in a moment.");
+  }
+
+  if (packageResponse.status === 404) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Destoc currently previews Node-based web apps with a package.json at the repository root. This repository does not match that shape.",
+    );
+  }
+
+  if (!packageResponse.ok) {
+    throw new AppError("VALIDATION_ERROR", `GitHub could not inspect this repository for preview compatibility (HTTP ${packageResponse.status}).`);
+  }
+
+  const packagePayload = await packageResponse.json().catch(() => null) as { content?: string; encoding?: string } | null;
+  if (!packagePayload?.content || packagePayload.encoding !== "base64") {
+    throw new AppError("VALIDATION_ERROR", "Destoc could not read this repository’s package.json.");
+  }
+
+  let manifest: { scripts?: Record<string, unknown> };
+  try {
+    manifest = JSON.parse(Buffer.from(packagePayload.content, "base64").toString("utf8")) as { scripts?: Record<string, unknown> };
+  } catch {
+    throw new AppError("VALIDATION_ERROR", "This repository has an invalid package.json, so Destoc cannot preview it.");
+  }
+
+  const scripts = manifest.scripts ?? {};
+  if (typeof scripts.dev !== "string") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Destoc can import this repository only when package.json defines a dev script for an editable live preview.",
+    );
+  }
 }
 
 export async function createWorkspace(userId: string, input: unknown) {

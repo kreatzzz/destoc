@@ -168,6 +168,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const activeRunRef = useRef<string | undefined>(data.preview?.runId);
   const startingRef = useRef(false);
   const autoStartAttemptedRef = useRef(false);
+  const streamingIntervalsRef = useRef<Array<ReturnType<typeof setInterval>>>([]);
 
   const previewStatusText = useMemo(
     () => progressText(previewStatus, previewLogs, previewUrl, previewError),
@@ -182,6 +183,26 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     setPreviewLogs(run.logs ?? "");
     setPreviewError(run.errorMessage ?? null);
     if (run.previewUrl && run.status === "READY") setPreviewUrl(run.previewUrl);
+  }, []);
+
+  const streamAssistantMessage = useCallback((content: string) => {
+    const id = crypto.randomUUID();
+    let index = 0;
+    setMessages((current) => [...current, { id, role: "assistant", content: "" }]);
+
+    const interval = setInterval(() => {
+      index = Math.min(content.length, index + 3);
+      setMessages((current) => current.map((message) => (
+        message.id === id ? { ...message, content: content.slice(0, index) } : message
+      )));
+
+      if (index >= content.length) {
+        clearInterval(interval);
+        streamingIntervalsRef.current = streamingIntervalsRef.current.filter((candidate) => candidate !== interval);
+      }
+    }, 18);
+
+    streamingIntervalsRef.current.push(interval);
   }, []);
 
   const pollSandboxRun = useCallback(async (runId: string) => {
@@ -290,6 +311,11 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   useEffect(() => {
     if (sandboxRunId) activeRunRef.current = sandboxRunId;
   }, [sandboxRunId]);
+
+  useEffect(() => () => {
+    for (const interval of streamingIntervalsRef.current) clearInterval(interval);
+    streamingIntervalsRef.current = [];
+  }, []);
 
   useEffect(() => {
     if (autoStartAttemptedRef.current) return;
@@ -424,7 +450,10 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       if (!reviewResponse.ok) throw new Error(reviewPayload?.error?.message ?? "Could not run the design review.");
 
       const nextSuggestions = reviewPayload?.review?.suggestions?.map(mapReviewSuggestion) ?? [];
-      setSuggestions(nextSuggestions);
+      setSuggestions((current) => [
+        ...current.filter((suggestion) => suggestion.status === "accepted"),
+        ...nextSuggestions,
+      ]);
       const hasPatch = nextSuggestions.some((suggestion) => suggestion.patch?.trim());
       setMessages((current) => [...current, {
         id: crypto.randomUUID(),
@@ -446,6 +475,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   async function acceptSuggestion(suggestionId: string) {
     setPendingSuggestionId(suggestionId);
     setAuditError(null);
+    streamAssistantMessage("Accepted. Applying the patch to the live sandbox…");
 
     try {
       const response = await fetch(`/api/suggestions/${suggestionId}/accept`, { method: "POST" });
@@ -455,24 +485,16 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       setSuggestions((current) => current.map((suggestion) => (
         suggestion.id === suggestionId ? { ...suggestion, status: "accepted" } : suggestion
       )));
-      setMessages((current) => [...current, {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: "Accepted. I’m applying it to the live preview now.",
-      }]);
       if (payload?.revision?.sandboxRun) {
         applyRunState(payload.revision.sandboxRun);
         window.setTimeout(() => setPreviewReloadKey((key) => key + 1), 450);
-        setMessages((current) => [...current, {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "Patch applied. Reloading the preview.",
-        }]);
+        streamAssistantMessage("Patch applied. The preview has been refreshed with the completed change.");
       }
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not accept this patch.";
       setAuditError(message);
+      streamAssistantMessage(message);
     } finally {
       setPendingSuggestionId(null);
     }

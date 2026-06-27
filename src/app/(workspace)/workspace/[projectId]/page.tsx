@@ -28,6 +28,11 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
   });
   const latestReview = project.reviews[0];
   const latestSandboxRun = project.sandboxRuns[0];
+  const persistedSuggestions = [
+    ...project.reviews.flatMap((review) => review.suggestions).filter((suggestion) => suggestion.status === "ACCEPTED"),
+    ...(latestReview?.suggestions.filter((suggestion) => suggestion.status !== "ACCEPTED") ?? []),
+  ];
+  const uniqueSuggestions = Array.from(new Map(persistedSuggestions.map((suggestion) => [suggestion.id, suggestion])).values());
   const data: WorkspaceData = {
     project: {
       id: project.id,
@@ -44,7 +49,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
       createdAt: revision.createdAt.toLocaleString(),
       isActive: index === 0,
     })),
-    suggestions: (latestReview?.suggestions ?? []).map((suggestion) => ({
+    suggestions: uniqueSuggestions.map((suggestion) => ({
       id: suggestion.id,
       title: suggestion.title,
       summary: suggestion.issue,

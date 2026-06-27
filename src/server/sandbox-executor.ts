@@ -17,6 +17,7 @@ const PREVIEW_START_TIMEOUT_MS = SANDBOX_TIMEOUT_MS - 60_000;
 const PREVIEW_HEALTH_CHECK_TIMEOUT_MS = 60_000;
 const MAX_PERSISTED_LOG_LENGTH = 20_000;
 const PREVIEW_LOG_FILE = ".destoc-preview.log";
+const PREVIEW_PORTS = [3000, 5173, 4173, 4321, 8080] as const;
 const PREVIEW_RUNTIME_HOSTS = [
   "fonts.googleapis.com",
   "fonts.gstatic.com",
@@ -24,6 +25,18 @@ const PREVIEW_RUNTIME_HOSTS = [
   "*.typekit.net",
   "cdn.jsdelivr.net",
   "unpkg.com",
+  "esm.sh",
+  "cdnjs.cloudflare.com",
+  "assets.vercel.com",
+  "images.unsplash.com",
+  "plus.unsplash.com",
+  "images.pexels.com",
+  "cdn.sanity.io",
+  "res.cloudinary.com",
+  "*.cloudinary.com",
+  "ik.imagekit.io",
+  "*.supabase.co",
+  "api.iconify.design",
   "cal.com",
   "*.cal.com",
   "umami.cooldash.xyz",
@@ -254,6 +267,17 @@ async function applyPatchToSandbox(sandbox: Sandbox, patch: string): Promise<str
     }
   }
 
+  const alreadyApplied = await sandbox.runCommand({
+    cmd: "git",
+    args: ["apply", "--reverse", "--check", "--recount", "--unidiff-zero", patchPath],
+    cwd: sandbox.cwd,
+    timeoutMs: 15_000,
+  });
+  const alreadyAppliedLog = await commandLog(alreadyApplied);
+  if (alreadyApplied.exitCode === 0) {
+    return truncateLog(`Patch was already present in this sandbox.\n${alreadyAppliedLog}`);
+  }
+
   const fallbackPath = `${sandbox.cwd}/.destoc-apply-fallback.cjs`;
   await sandbox.fs.writeFile(fallbackPath, createExactPatchFallbackScript(), "utf8");
   const fallback = await sandbox.runCommand({
@@ -270,6 +294,33 @@ async function applyPatchToSandbox(sandbox: Sandbox, patch: string): Promise<str
   }
 
   return truncateLog(`git apply needed fallback:\n${checkLog}\n${fallbackLog}`);
+}
+
+async function acceptedRevisionPatches(projectId: string, revisionId?: string): Promise<string[]> {
+  const revisions = await getPrisma().revision.findMany({
+    where: {
+      projectId,
+      status: "READY",
+      id: revisionId ? { not: revisionId } : undefined,
+    },
+    orderBy: { createdAt: "asc" },
+    select: { patch: true },
+  });
+
+  return revisions.map((revision) => revision.patch).filter((patch) => patch.trim().length > 0);
+}
+
+function previewStartCommand(nextProject: boolean, scripts: PackageScripts): string {
+  if (nextProject && !scripts.dev) {
+    return `exec npm run start -- -H 0.0.0.0 -p 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
+  }
+
+  if (nextProject) {
+    return `exec npm run dev -- --hostname 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
+  }
+
+  const scriptName = scripts.dev ? "dev" : "start";
+  return `HOST=0.0.0.0 PORT=3000 exec npm run ${scriptName} -- --host 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
 }
 
 /**
@@ -323,22 +374,27 @@ export async function executeSandboxRun(
 
     const scripts = await packageScripts(sandbox);
     const nextProject = await isNextProject(sandbox);
-    if (!nextProject && !scripts.dev && !scripts.start) {
+    if (!scripts.dev) {
       throw new AppError(
         "VALIDATION_ERROR",
-        "This repository does not define a runnable web preview script. Destoc currently expects an npm dev or start script.",
+        "This repository does not define an npm dev script. Destoc needs a dev server so accepted code changes can update the live preview.",
       );
     }
 
-    if (nextProject && !scripts.dev && (!scripts.build || !scripts.start)) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "This Next.js repository needs npm run dev, or both npm run build and npm run start, for a sandbox preview.",
-      );
+    const cumulativePatches = await acceptedRevisionPatches(project.id, input.revisionId);
+    if (cumulativePatches.length) {
+      logs = appendLog(logs || `Provisioned sandbox ${sandbox.name}.`, `Replaying ${cumulativePatches.length} accepted change${cumulativePatches.length === 1 ? "" : "s"}.`);
+      await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+
+      for (const [index, patch] of cumulativePatches.entries()) {
+        const patchLog = await applyPatchToSandbox(sandbox, patch);
+        logs = appendLog(logs, `Accepted change ${index + 1}/${cumulativePatches.length}:\n${patchLog}`);
+        await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+      }
     }
 
     if (input.patch) {
-      logs = appendLog(logs || `Provisioned sandbox ${sandbox.name}.`, "Applying accepted patch.");
+      logs = appendLog(logs || `Provisioned sandbox ${sandbox.name}.`, "Applying requested patch.");
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
       const patchLog = await applyPatchToSandbox(sandbox, input.patch);
       logs = appendLog(logs, `Patch apply result:\n${patchLog}`);
@@ -366,8 +422,7 @@ export async function executeSandboxRun(
     logs = appendLog(logs, installLog);
 
     if (install.exitCode !== 0) {
-      throw new AppError("INTERNAL_ERROR", "Sandbox dependency installation failed.", {
-        expose: false,
+      throw new AppError("VALIDATION_ERROR", "This repository could not install inside the preview sandbox. It may need private packages, unsupported native dependencies, or missing lockfile metadata.", {
         cause: installLog,
       });
     }
@@ -384,17 +439,16 @@ export async function executeSandboxRun(
       const buildLog = await commandLog(build);
       logs = appendLog(logs, `Production build:\n${buildLog}`);
       if (build.exitCode !== 0) {
-        throw new AppError("INTERNAL_ERROR", "Sandbox production build failed.", {
-          expose: false,
+        throw new AppError("VALIDATION_ERROR", "This repository could not build inside the preview sandbox. Check the build log for missing environment variables or unsupported build steps.", {
           cause: buildLog,
         });
       }
     }
 
-    // The untrusted application never receives application credentials. Keep
-    // the public rendering hosts needed by a typical web UI (fonts and embeds)
-    // while denying arbitrary outbound connections from the preview runtime.
-    await sandbox.updateNetworkPolicy({ allow: PREVIEW_RUNTIME_HOSTS });
+    // The untrusted application never receives application credentials. At
+    // preview runtime we allow public egress so real websites can load remote
+    // image/CDN/font assets instead of rendering half-empty inside the iframe.
+    await sandbox.updateNetworkPolicy("allow-all");
 
     logs = appendLog(logs, "Starting preview server.");
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
@@ -402,18 +456,14 @@ export async function executeSandboxRun(
       cmd: "sh",
       args: [
         "-lc",
-        nextProject && !scripts.dev
-          ? `exec npm run start -- -H 0.0.0.0 -p 3000 > ${PREVIEW_LOG_FILE} 2>&1`
-          : scripts.dev
-            ? `exec npm run dev -- --hostname 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`
-            : `exec npm run start -- --hostname 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`,
+        previewStartCommand(nextProject, scripts),
       ],
       cwd: sandbox.cwd,
       detached: true,
       timeoutMs: PREVIEW_START_TIMEOUT_MS,
     });
 
-    const upstreamPort = await waitForLocalPreview(sandbox, [3000, 5173]);
+    const upstreamPort = await waitForLocalPreview(sandbox, PREVIEW_PORTS);
     if (!upstreamPort) {
       logs = appendLog(logs, `Preview startup log:\n${await readPreviewLog(sandbox)}`);
       throw new AppError(
