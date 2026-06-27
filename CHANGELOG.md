@@ -53,6 +53,7 @@ All notable project decisions and changes are recorded here.
 - Repository import now verifies public GitHub repository and branch existence, code changes no longer auto-open, accepted patches apply to the running sandbox, `/workspace` uses logout instead of project deletion, chat surfaces are more minimal, invalid provider diffs are rejected before accept, direct multi-component text notes produce one combined patch, and `DESIGN.md` defines the Destoc design system.
 - Suggestion acceptance now marks suggestions as accepted only after the sandbox patch applies successfully; failed patch applications leave suggestions retryable.
 - The project-detail workspace header now uses logout instead of a delete-project icon, matching the workspace index behavior.
+- Workspace chat now uses the new shadcn `MessageScroller`, `Message`, and `Bubble` primitives, adds the related shadcn chat primitives to the UI library, and applies the Mobbin-backed direction of quiet rails, compact cards, and a stronger composer surface.
 
 ### Deferred
 

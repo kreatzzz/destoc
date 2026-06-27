@@ -150,6 +150,8 @@ Tiny icon buttons need at least 32px visible size and 40px practical hit target 
 
 **Chat rail:** minimal message stack, no large headings. The rail should feel like a working log. Assistant messages are dark and quiet; user messages are yellow and compact.
 
+Use shadcn chat primitives (`MessageScroller`, `Message`, and `Bubble`) as the default foundation for chat surfaces. The visual reference is closer to the quiet rails and centered composers in Mobbin examples from Obvious, Notion, Langdock, and StackAI: sparse message density, compact chips, and a composer that feels like the primary control.
+
 **Selected component pills:** show the number first, then role/name. If overflow occurs, show a final `+N` pill. Notes belong directly above the composer and should not shift the whole layout dramatically.
 
 **Suggestion card:** decisions live in chat. The card shows title, short rationale, impact/status, and Accept/Reject. It does not show raw diff.

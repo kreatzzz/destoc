@@ -4,7 +4,20 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { Check, Loader2 } from "lucide-react";
 
 import { AnimatedArrowUpIcon, AnimatedXIcon } from "@/components/ui/animated-icons";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
+import {
+  Message,
+  MessageContent,
+} from "@/components/ui/message";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -103,7 +116,7 @@ export function WorkspaceChat({
 
   return (
     <aside
-      className="relative flex h-full shrink-0 flex-col border-r border-white/[0.07] bg-[#10100f] text-zinc-200"
+      className="relative flex h-full shrink-0 flex-col border-r border-white/[0.07] bg-[#10100f] text-zinc-200 shadow-[inset_-1px_0_0_rgba(255,255,255,0.025)]"
       style={{ width }}
     >
       <div
@@ -113,82 +126,121 @@ export function WorkspaceChat({
         onPointerDown={startResize}
         className="absolute right-0 top-0 z-20 h-full w-2 cursor-col-resize touch-none bg-transparent transition-[background-color] duration-150 hover:bg-[#f7ca58]/20"
       />
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={cn(
-              "group rounded-xl px-3 py-2 text-sm leading-6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]",
-              message.role === "user"
-                ? "ml-10 bg-[#f7ca58] text-[#1b1205]"
-                : "mr-6 bg-white/[0.035] text-zinc-300",
-            )}
-          >
-            <p className="whitespace-pre-wrap text-pretty">{message.content}</p>
-          </div>
-        ))}
-        {changeSuggestions.map((suggestion) => {
-          const isPending = pendingSuggestionId === suggestion.id;
-          const isAccepted = suggestion.status === "accepted";
-          const isRejected = suggestion.status === "rejected";
+      <MessageScrollerProvider>
+        <MessageScroller className="min-h-0 flex-1">
+          <MessageScrollerViewport className="px-4 py-4">
+            <MessageScrollerContent className="gap-2.5">
+              {messages.map((chatMessage) => {
+                const isUser = chatMessage.role === "user";
 
-          return (
-            <article
-              key={suggestion.id}
-              className="mr-3 rounded-2xl bg-[#181817] p-3 text-sm text-zinc-300 shadow-[0_14px_40px_rgba(0,0,0,0.18),inset_0_0_0_1px_rgba(255,255,255,0.07)]"
-            >
-              <div className="flex items-start gap-3">
-                <span className={cn(
-                  "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tabular-nums",
-                  isAccepted ? "bg-emerald-400/15 text-emerald-200" : isRejected ? "bg-zinc-700 text-zinc-400" : "bg-[#f7ca58] text-[#1b1205]",
-                )}>
-                  {isAccepted ? <Check className="size-3.5" /> : changeSuggestions.findIndex((candidate) => candidate.id === suggestion.id) + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium leading-5 text-zinc-100 text-pretty">{suggestion.title}</p>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500 text-pretty">{suggestion.summary}</p>
-                  <p className="mt-2 text-[11px] text-zinc-600">{suggestion.impact} · {suggestion.status}</p>
-                </div>
-              </div>
+                return (
+                  <MessageScrollerItem key={chatMessage.id}>
+                    <Message align={isUser ? "end" : "start"}>
+                      <MessageContent>
+                        <Bubble align={isUser ? "end" : "start"} variant={isUser ? "default" : "muted"} className="max-w-[92%]">
+                          <BubbleContent
+                            className={cn(
+                              "rounded-[18px] border-0 px-3 py-2 text-sm leading-6 shadow-none",
+                              isUser
+                                ? "bg-[#f7ca58] text-[#1b1205] shadow-[0_8px_22px_rgba(247,202,88,0.10)]"
+                                : "bg-white/[0.026] text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]",
+                            )}
+                          >
+                            <p className="whitespace-pre-wrap text-pretty">{chatMessage.content}</p>
+                          </BubbleContent>
+                        </Bubble>
+                      </MessageContent>
+                    </Message>
+                  </MessageScrollerItem>
+                );
+              })}
+              {changeSuggestions.map((suggestion) => {
+                const isPending = pendingSuggestionId === suggestion.id;
+                const isAccepted = suggestion.status === "accepted";
+                const isRejected = suggestion.status === "rejected";
 
-              {suggestion.status === "pending" ? (
-                <div className="mt-3 flex items-center justify-end gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={isPending}
-                    onClick={() => onRejectSuggestion(suggestion.id)}
-                    className="h-8 px-3 text-zinc-400 transition-[color,background-color,scale] duration-150 active:scale-[0.96] hover:text-zinc-100"
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={isPending}
-                    onClick={() => onAcceptSuggestion(suggestion.id)}
-                    className="h-8 bg-[#f7ca58] px-3 text-[#1b1205] transition-[background-color,scale] duration-150 active:scale-[0.96] hover:bg-[#ffd879]"
-                  >
-                    {isPending ? "Applying…" : "Accept"}
-                  </Button>
-                </div>
+                return (
+                  <MessageScrollerItem key={suggestion.id}>
+                    <Message align="start">
+                      <MessageContent>
+                        <Bubble variant="muted" className="max-w-[94%]">
+                          <BubbleContent className="rounded-[22px] border-0 bg-[#171715] p-3 text-sm text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+                            <div className="flex items-start gap-3">
+                              <span className={cn(
+                                "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tabular-nums",
+                                isAccepted ? "bg-emerald-400/15 text-emerald-200" : isRejected ? "bg-zinc-700 text-zinc-400" : "bg-[#f7ca58] text-[#1b1205]",
+                              )}>
+                                {isAccepted ? <Check className="size-3.5" /> : changeSuggestions.findIndex((candidate) => candidate.id === suggestion.id) + 1}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium leading-5 text-zinc-100 text-pretty">{suggestion.title}</p>
+                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500 text-pretty">{suggestion.summary}</p>
+                                <p className="mt-2 text-[11px] text-zinc-600">{suggestion.impact} · {suggestion.status}</p>
+                              </div>
+                            </div>
+
+                            {suggestion.status === "pending" ? (
+                              <div className="mt-3 flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={isPending}
+                                  onClick={() => onRejectSuggestion(suggestion.id)}
+                                  className="h-8 min-w-10 px-3 text-zinc-400 transition-[color,background-color,scale] duration-150 active:scale-[0.96] hover:text-zinc-100"
+                                >
+                                  Reject
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  disabled={isPending}
+                                  onClick={() => onAcceptSuggestion(suggestion.id)}
+                                  className="h-8 min-w-10 bg-[#f7ca58] px-3 text-[#1b1205] transition-[background-color,scale] duration-150 active:scale-[0.96] hover:bg-[#ffd879]"
+                                >
+                                  {isPending ? "Applying…" : "Accept"}
+                                </Button>
+                              </div>
+                            ) : null}
+                          </BubbleContent>
+                        </Bubble>
+                      </MessageContent>
+                    </Message>
+                  </MessageScrollerItem>
+                );
+              })}
+              {isAuditPending ? (
+                <MessageScrollerItem scrollAnchor>
+                  <Message align="start">
+                    <MessageContent>
+                      <Bubble variant="muted" className="max-w-[92%]">
+                        <BubbleContent className="rounded-full border-0 bg-white/[0.035] px-3 py-2 text-sm leading-6 text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="text-zinc-500">Drafting code</span>
+                            <span className="inline-flex items-center gap-1">
+                              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-160ms]" />
+                              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-80ms]" />
+                              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58]" />
+                            </span>
+                          </span>
+                        </BubbleContent>
+                      </Bubble>
+                    </MessageContent>
+                  </Message>
+                </MessageScrollerItem>
               ) : null}
-            </article>
-          );
-        })}
-        {isAuditPending ? (
-          <div className="mr-8 inline-flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-2.5 text-sm leading-6 text-zinc-300">
-            <span className="text-zinc-500">Drafting code</span>
-            <span className="inline-flex items-center gap-1">
-              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-160ms]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-80ms]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58]" />
-            </span>
-          </div>
-        ) : null}
-        {auditError ? <p role="alert" className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">{auditError}</p> : null}
-      </div>
+              {auditError ? (
+                <MessageScrollerItem scrollAnchor>
+                  <p role="alert" className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">
+                    {auditError}
+                  </p>
+                </MessageScrollerItem>
+              ) : null}
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton className="bottom-3 border-white/10 bg-[#171715] text-[#f7ca58] hover:bg-[#1f1f1c]" />
+        </MessageScroller>
+      </MessageScrollerProvider>
 
-      <div className="p-2.5">
+      <div className="p-3">
         <div className="mb-2 min-h-7">
           {selectedElements.length ? (
             <div className="flex max-w-full items-center gap-1.5 overflow-hidden">
@@ -235,7 +287,7 @@ export function WorkspaceChat({
           )}
         </div>
         {activeSelection ? (
-          <div className="mb-2 rounded-2xl bg-white/[0.035] p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
+          <div className="mb-2 rounded-[22px] bg-white/[0.028] p-2.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.045)]">
             <div className="mb-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-zinc-500">
               <span className="truncate">
                 Note for <span className="font-mono tabular-nums text-[#f7ca58]">#{activeSelectionNumber}</span> {elementLabel(activeSelection)}
@@ -246,11 +298,11 @@ export function WorkspaceChat({
               value={activeSelection.note ?? ""}
               onChange={(event) => onSelectionNoteChange(activeSelection.id, event.target.value)}
               placeholder="Add what should change or what to review here…"
-              className="max-h-24 min-h-16 resize-none border-0 bg-transparent px-2 py-2 text-xs leading-5 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
+              className="max-h-24 min-h-16 resize-none rounded-2xl border-0 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-1 focus-visible:ring-[#f7ca58]/20"
             />
           </div>
         ) : null}
-        <div className="rounded-2xl bg-[#171715] p-2 shadow-[0_12px_36px_rgba(0,0,0,0.2),inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+        <div className="rounded-[26px] bg-[#171715] p-2.5 shadow-[0_18px_50px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(255,255,255,0.075)]">
           <Textarea
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}
@@ -261,7 +313,7 @@ export function WorkspaceChat({
               }
             }}
             placeholder={hasSelectedElementNotes ? "Optional: add extra direction for these notes…" : "Ask for a design audit or targeted improvement…"}
-            className="max-h-40 min-h-24 resize-none border-0 bg-transparent px-2 py-2 text-sm text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
+            className="max-h-40 min-h-20 resize-none rounded-[18px] border-0 bg-transparent px-2.5 py-2 text-sm leading-6 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
           />
           <div className="flex items-center justify-between px-1 pt-1">
             <p className="text-[10px] text-zinc-600">⌘ Enter to send</p>
