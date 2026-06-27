@@ -211,13 +211,18 @@ for (const line of lines) {
   if (line.startsWith("@@")) {
     finishHunk();
     if (!currentFile) throw new Error("fallback hunk is missing a target file");
-    currentHunk = { file: currentFile, oldLines: [], newLines: [] };
+    currentHunk = { file: currentFile, oldLines: [], newLines: [], removedLines: [], addedLines: [] };
     continue;
   }
   if (!currentHunk) continue;
   if (line.startsWith("--- ") || line.startsWith("+++ ")) continue;
-  if (line.startsWith("-")) currentHunk.oldLines.push(line.slice(1));
-  else if (line.startsWith("+")) currentHunk.newLines.push(line.slice(1));
+  if (line.startsWith("-")) {
+    currentHunk.oldLines.push(line.slice(1));
+    currentHunk.removedLines.push(line.slice(1));
+  } else if (line.startsWith("+")) {
+    currentHunk.newLines.push(line.slice(1));
+    currentHunk.addedLines.push(line.slice(1));
+  }
   else if (line.startsWith(" ")) {
     currentHunk.oldLines.push(line.slice(1));
     currentHunk.newLines.push(line.slice(1));
@@ -234,11 +239,42 @@ for (const hunk of hunks) {
   const filePath = path.join(process.cwd(), hunk.file);
   const source = fs.readFileSync(filePath, "utf8");
   const index = source.indexOf(oldBlock);
-  if (index === -1) throw new Error("fallback could not find exact removed block in " + hunk.file);
-  fs.writeFileSync(filePath, source.slice(0, index) + newBlock + source.slice(index + oldBlock.length));
+  if (index !== -1) {
+    fs.writeFileSync(filePath, source.slice(0, index) + newBlock + source.slice(index + oldBlock.length));
+    continue;
+  }
+
+  if (newBlock.length > 0 && source.includes(newBlock)) continue;
+
+  let nextSource = source;
+  let changed = false;
+  if (hunk.removedLines.length === hunk.addedLines.length && hunk.removedLines.length > 0) {
+    for (let index = 0; index < hunk.removedLines.length; index += 1) {
+      const removedLine = hunk.removedLines[index];
+      const addedLine = hunk.addedLines[index];
+      if (nextSource.includes(addedLine)) continue;
+      if (!nextSource.includes(removedLine)) continue;
+      nextSource = nextSource.replace(removedLine, addedLine);
+      changed = true;
+    }
+  } else if (hunk.addedLines.length === 0) {
+    for (const removedLine of hunk.removedLines) {
+      const withTrailingNewline = removedLine + "\n";
+      if (nextSource.includes(withTrailingNewline)) {
+        nextSource = nextSource.replace(withTrailingNewline, "");
+        changed = true;
+      } else if (nextSource.includes(removedLine)) {
+        nextSource = nextSource.replace(removedLine, "");
+        changed = true;
+      }
+    }
+  }
+
+  if (!changed) throw new Error("fallback could not find exact or overlapping removed block in " + hunk.file);
+  fs.writeFileSync(filePath, nextSource);
 }
 
-process.stdout.write("Fallback exact-block patch applied to " + new Set(hunks.map((hunk) => hunk.file)).size + " file(s).\n");
+process.stdout.write("Fallback patch applied to " + new Set(hunks.map((hunk) => hunk.file)).size + " file(s).\n");
 `;
 }
 

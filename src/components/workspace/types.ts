@@ -1,4 +1,4 @@
-export type ReviewStatus = "pending" | "accepted" | "rejected";
+export type ReviewStatus = "pending" | "accepted" | "rejected" | "failed";
 
 export interface WorkspaceProject {
   id: string;

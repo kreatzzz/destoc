@@ -57,6 +57,7 @@ All notable project decisions and changes are recorded here.
 - Workspace shell now groups repository content in a warm tinted panel, rounds the connected-project summary, aligns top-bar icons with animated lucide icons, and compacts chat/update surfaces.
 - Workspace chat now separates user and Destoc messages more clearly, removes accepted checkmark confirmation cards, streams acceptance/completion text, and keeps accepted diffs across prompts.
 - Sandbox previews now require an editable `dev` script, use clearer incompatible-repository errors, allow public runtime egress so external assets can render, and replay accepted patches when starting a fresh sandbox.
+- Failed patch applications now return suggestions to a retryable state instead of leaving them visually accepted.
 
 ### Deferred
 

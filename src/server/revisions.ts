@@ -132,6 +132,7 @@ export async function transitionRevision(
     await getPrisma().suggestion.update({
       where: { id: revision.suggestionId },
       data: {
+        status: "PENDING",
         errorCode: metadata.errorCode,
         errorMessage: metadata.errorMessage,
       },

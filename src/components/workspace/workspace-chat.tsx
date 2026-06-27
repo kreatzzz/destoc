@@ -87,7 +87,7 @@ export function WorkspaceChat({
   const activeSelectionNumber = activeSelection
     ? selectedElements.findIndex((element) => element.id === activeSelection.id) + 1
     : 0;
-  const changeSuggestions = suggestions.filter((suggestion) => suggestion.patch?.trim() && suggestion.status === "pending");
+  const changeSuggestions = suggestions.filter((suggestion) => suggestion.patch?.trim() && (suggestion.status === "pending" || suggestion.status === "failed"));
 
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -182,7 +182,13 @@ export function WorkspaceChat({
                               </div>
                             </div>
 
-                            {suggestion.status === "pending" ? (
+                            {suggestion.status === "failed" ? (
+                              <p className="mt-3 rounded-xl bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">
+                                This patch failed against the current sandbox. Ask again to regenerate it from the latest preview state.
+                              </p>
+                            ) : null}
+
+                            {suggestion.status === "pending" || suggestion.status === "failed" ? (
                               <div className="mt-3 flex items-center justify-end gap-2">
                                 <Button
                                   size="sm"

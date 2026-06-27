@@ -50,6 +50,7 @@ interface DesignWorkspaceProps {
 }
 
 const activeSandboxStatuses = new Set<WorkspacePreview["status"]>(["QUEUED", "PROVISIONING", "BUILDING"]);
+const retryablePreviewErrors = new Set(["Accepted patch could not be applied cleanly."]);
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -129,7 +130,7 @@ function mapReviewSuggestion(suggestion: ReviewSuggestionPayload): WorkspaceSugg
     summary: suggestion.issue,
     rationale: suggestion.rationale,
     impact: suggestion.severity === "high" ? "High impact" : suggestion.severity === "medium" ? "Medium impact" : "Low impact",
-    status: suggestion.status === "ACCEPTED" ? "accepted" : suggestion.status === "REJECTED" ? "rejected" : "pending",
+    status: suggestion.status === "ACCEPTED" ? "accepted" : suggestion.status === "REJECTED" ? "rejected" : suggestion.status === "FAILED" ? "failed" : "pending",
     patch: suggestion.patch,
     verificationChecklist: Array.isArray(suggestion.verificationChecklist)
       ? suggestion.verificationChecklist.filter((item): item is string => typeof item === "string")
@@ -329,7 +330,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       };
     }
 
-    if (!previewUrl && previewStatus !== "FAILED") {
+    if (!previewUrl && (previewStatus !== "FAILED" || retryablePreviewErrors.has(previewError ?? ""))) {
       autoStartAttemptedRef.current = true;
       timeout = setTimeout(() => void startPreview(), 0);
       return () => {
@@ -349,7 +350,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
         }
       })();
     }
-  }, [applyRunState, data.project.id, pollSandboxRun, previewStatus, previewUrl, sandboxRunId, startPreview]);
+  }, [applyRunState, data.project.id, pollSandboxRun, previewError, previewStatus, previewUrl, sandboxRunId, startPreview]);
 
   function addSelectedElement(selection: WorkspaceSelectedElement) {
     setSelectedElements((current) => {

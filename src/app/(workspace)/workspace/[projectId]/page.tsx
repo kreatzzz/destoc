@@ -9,6 +9,7 @@ import { getProject } from "@/server";
 function toSuggestionStatus(status: string): ReviewStatus {
   if (status === "ACCEPTED") return "accepted";
   if (status === "REJECTED") return "rejected";
+  if (status === "FAILED") return "failed";
   return "pending";
 }
 
