@@ -57,6 +57,7 @@ export interface WorkspaceChatMessage {
   id: string;
   role: "assistant" | "user";
   content: string;
+  suggestionIds?: string[];
 }
 
 export interface WorkspaceData {

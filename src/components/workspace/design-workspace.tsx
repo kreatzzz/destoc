@@ -157,6 +157,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       id: "welcome",
       role: "assistant",
       content: "Select components in the preview, then ask for a design audit or improvement plan. I’ll keep the selected components as context.",
+      suggestionIds: data.suggestions.filter((suggestion) => suggestion.patch?.trim()).map((suggestion) => suggestion.id),
     },
   ]);
   const [isAuditPending, setIsAuditPending] = useState(false);
@@ -451,6 +452,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       if (!reviewResponse.ok) throw new Error(reviewPayload?.error?.message ?? "Could not run the design review.");
 
       const nextSuggestions = reviewPayload?.review?.suggestions?.map(mapReviewSuggestion) ?? [];
+      const nextSuggestionIds = nextSuggestions.filter((suggestion) => suggestion.patch?.trim()).map((suggestion) => suggestion.id);
       setSuggestions((current) => [
         ...current.filter((suggestion) => suggestion.status === "accepted"),
         ...nextSuggestions,
@@ -459,6 +461,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       setMessages((current) => [...current, {
         id: crypto.randomUUID(),
         role: "assistant",
+        suggestionIds: nextSuggestionIds,
         content: hasPatch
           ? "I drafted a code change. Review the card below; the diff is in the code pane."
           : "I could not draft a safe diff yet. Try selecting a more specific component or adding a more direct note.",

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Message,
   MessageContent,
+  MessageHeader,
 } from "@/components/ui/message";
 import {
   MessageScroller,
@@ -18,6 +19,7 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -87,7 +89,7 @@ export function WorkspaceChat({
   const activeSelectionNumber = activeSelection
     ? selectedElements.findIndex((element) => element.id === activeSelection.id) + 1
     : 0;
-  const changeSuggestions = suggestions.filter((suggestion) => suggestion.patch?.trim() && (suggestion.status === "pending" || suggestion.status === "failed"));
+  const suggestionsById = new Map(suggestions.map((suggestion) => [suggestion.id, suggestion]));
 
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -126,98 +128,98 @@ export function WorkspaceChat({
         onPointerDown={startResize}
         className="absolute right-0 top-0 z-20 h-full w-2 cursor-col-resize touch-none bg-transparent transition-[background-color] duration-150 hover:bg-[#f7ca58]/20"
       />
-      <MessageScrollerProvider>
+      <MessageScrollerProvider autoScroll defaultScrollPosition="end">
         <MessageScroller className="min-h-0 flex-1">
           <MessageScrollerViewport className="px-4 py-4">
             <MessageScrollerContent className="gap-2.5">
               {messages.map((chatMessage) => {
                 const isUser = chatMessage.role === "user";
+                const attachedSuggestions = (chatMessage.suggestionIds ?? [])
+                  .map((suggestionId) => suggestionsById.get(suggestionId))
+                  .filter((suggestion): suggestion is WorkspaceSuggestion => Boolean(
+                    suggestion?.patch?.trim() && (suggestion.status === "pending" || suggestion.status === "failed"),
+                  ));
 
                 return (
-                  <MessageScrollerItem key={chatMessage.id}>
-                    <Message align={isUser ? "end" : "start"}>
+                  <MessageScrollerItem key={chatMessage.id} messageId={chatMessage.id} scrollAnchor>
+                    <Message align={isUser ? "end" : "start"} className="items-end">
                       <MessageContent>
-                        <Bubble align={isUser ? "end" : "start"} variant={isUser ? "default" : "muted"} className={cn("max-w-[92%]", isUser ? "ml-auto" : "mr-auto")}>
+                        <MessageHeader className={cn("px-1 pb-0.5 text-[10px] uppercase tracking-[0.14em]", isUser ? "justify-end text-[#a77921]" : "text-[#f7ca58]")}>
+                          {isUser ? "You" : "Destoc"}
+                        </MessageHeader>
+                        <Bubble align={isUser ? "end" : "start"} variant={isUser ? "default" : "muted"} className={cn("max-w-[88%]", isUser ? "ml-auto" : "mr-auto")}>
                           <BubbleContent
                             className={cn(
                               "border-0 px-3 py-2 text-sm leading-6 shadow-none",
                               isUser
-                                ? "rounded-[16px_16px_4px_16px] bg-[#f7ca58] text-[#1b1205] shadow-[0_8px_22px_rgba(247,202,88,0.10)]"
-                                : "rounded-[16px_16px_16px_4px] bg-white/[0.035] text-zinc-300 shadow-[inset_3px_0_0_rgba(247,202,88,0.52),inset_0_0_0_1px_rgba(255,255,255,0.035)]",
+                                ? "rounded-[14px_14px_5px_14px] bg-[#f7ca58] text-[#1b1205]"
+                                : "rounded-[14px_14px_14px_5px] bg-white/[0.04] text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]",
                             )}
                           >
-                            <span className={cn(
-                              "mb-1 block text-[10px] font-medium uppercase tracking-[0.16em]",
-                              isUser ? "text-[#5f4210]" : "text-[#f7ca58]",
-                            )}>
-                              {isUser ? "You" : "Destoc"}
-                            </span>
                             <p className="whitespace-pre-wrap text-pretty">{chatMessage.content}</p>
                           </BubbleContent>
                         </Bubble>
-                      </MessageContent>
-                    </Message>
-                  </MessageScrollerItem>
-                );
-              })}
-              {changeSuggestions.map((suggestion) => {
-                const isPending = pendingSuggestionId === suggestion.id;
+                        {attachedSuggestions.map((suggestion, index) => {
+                          const isPending = pendingSuggestionId === suggestion.id;
 
-                return (
-                  <MessageScrollerItem key={suggestion.id}>
-                    <Message align="start">
-                      <MessageContent>
-                        <Bubble variant="muted" className="max-w-[94%]">
-                          <BubbleContent className="rounded-2xl border-0 bg-[#171715] p-3 text-sm text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
-                            <div className="flex items-start gap-3">
-                              <span className={cn(
-                                "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tabular-nums",
-                                "bg-[#f7ca58] text-[#1b1205]",
-                              )}>
-                                {changeSuggestions.findIndex((candidate) => candidate.id === suggestion.id) + 1}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium leading-5 text-zinc-100 text-pretty">{suggestion.title}</p>
-                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500 text-pretty">{suggestion.summary}</p>
-                              </div>
-                            </div>
+                          return (
+                            <Bubble key={suggestion.id} variant="muted" className="mt-1 max-w-[94%]">
+                              <BubbleContent className="w-full rounded-xl bg-[#171715] p-2.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.055)]">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[#f7ca58] text-[10px] font-semibold tabular-nums text-[#1b1205]">
+                                    {index + 1}
+                                  </span>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium text-zinc-100">{suggestion.title}</p>
+                                    <p className="truncate text-[11px] text-zinc-500">{suggestion.summary}</p>
+                                  </div>
+                                  <span className={cn(
+                                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] capitalize",
+                                    suggestion.status === "failed" ? "bg-rose-400/10 text-rose-200" : "bg-[#f7ca58]/10 text-[#ffd879]",
+                                  )}>
+                                    {suggestion.status === "failed" ? "Retry" : "Diff"}
+                                  </span>
+                                </div>
 
-                            {suggestion.status === "failed" ? (
-                              <p className="mt-3 rounded-xl bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">
-                                This patch failed against the current sandbox. Ask again to regenerate it from the latest preview state.
-                              </p>
-                            ) : null}
+                                {suggestion.status === "failed" ? (
+                                  <Marker className="mt-2 gap-1.5 rounded-lg bg-rose-400/10 px-2 py-1.5 text-[11px] leading-4 text-rose-200">
+                                    <MarkerIcon className="grid size-2 place-items-center">
+                                      <span className="size-1.5 rounded-full bg-rose-300" />
+                                    </MarkerIcon>
+                                    <MarkerContent>Patch failed against this sandbox. Regenerate from the latest preview.</MarkerContent>
+                                  </Marker>
+                                ) : null}
 
-                            {suggestion.status === "pending" || suggestion.status === "failed" ? (
-                              <div className="mt-3 flex items-center justify-end gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  disabled={isPending}
-                                  onClick={() => onRejectSuggestion(suggestion.id)}
-                                  className="h-8 min-w-10 px-3 text-zinc-400 transition-[color,background-color,scale] duration-150 active:scale-[0.96] hover:text-zinc-100"
-                                >
-                                  Reject
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  disabled={isPending}
-                                  onClick={() => onAcceptSuggestion(suggestion.id)}
-                                  className="h-8 min-w-10 bg-[#f7ca58] px-3 text-[#1b1205] transition-[background-color,scale] duration-150 active:scale-[0.96] hover:bg-[#ffd879]"
-                                >
-                                  {isPending ? "Applying…" : "Accept"}
-                                </Button>
-                              </div>
-                            ) : null}
-                          </BubbleContent>
-                        </Bubble>
+                                <div className="mt-2 flex items-center justify-end gap-1">
+                                  <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    disabled={isPending}
+                                    onClick={() => onRejectSuggestion(suggestion.id)}
+                                    className="h-7 px-2 text-xs text-zinc-500 transition-[color,background-color,scale] duration-150 active:scale-[0.96] hover:text-zinc-100"
+                                  >
+                                    Reject
+                                  </Button>
+                                  <Button
+                                    size="xs"
+                                    disabled={isPending}
+                                    onClick={() => onAcceptSuggestion(suggestion.id)}
+                                    className="h-7 bg-[#f7ca58] px-2.5 text-xs text-[#1b1205] transition-[background-color,scale] duration-150 active:scale-[0.96] hover:bg-[#ffd879]"
+                                  >
+                                    {isPending ? "Applying" : "Accept"}
+                                  </Button>
+                                </div>
+                              </BubbleContent>
+                            </Bubble>
+                          );
+                        })}
                       </MessageContent>
                     </Message>
                   </MessageScrollerItem>
                 );
               })}
               {isAuditPending ? (
-                <MessageScrollerItem scrollAnchor>
+                <MessageScrollerItem messageId="drafting" scrollAnchor>
                   <Message align="start">
                     <MessageContent>
                       <Bubble variant="muted" className="max-w-[92%]">
@@ -237,10 +239,13 @@ export function WorkspaceChat({
                 </MessageScrollerItem>
               ) : null}
               {auditError ? (
-                <MessageScrollerItem scrollAnchor>
-                  <p role="alert" className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">
-                    {auditError}
-                  </p>
+                <MessageScrollerItem messageId="audit-error" scrollAnchor>
+                  <Marker role="alert" className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">
+                    <MarkerIcon className="grid size-2.5 place-items-center">
+                      <span className="size-1.5 rounded-full bg-rose-300" />
+                    </MarkerIcon>
+                    <MarkerContent>{auditError}</MarkerContent>
+                  </Marker>
                 </MessageScrollerItem>
               ) : null}
             </MessageScrollerContent>
