@@ -21,6 +21,8 @@ bun run dev
 
 The seeded account defaults to `demo@destoc.local` / `DemoPassword123!`. Change both values outside local development.
 
+Agentation and the Next.js dev indicator are visible in local development by default. Set `NEXT_PUBLIC_SHOW_AGENTATION="false"` only if you need to temporarily hide the Agentation toolbar.
+
 ## Commands
 
 ```bash

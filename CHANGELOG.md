@@ -20,6 +20,9 @@ All notable project decisions and changes are recorded here.
 
 ### Changed
 
+- Agentation is visible in development by default again, and the Next.js dev indicator is restored for local project feedback.
+- The preview bridge now injects the design-mode bridge through a streaming transform instead of buffering full HTML, improving reliability for streaming and client-heavy pages.
+- Stalled entrance-motion elements are recovered in normal preview mode as well as design mode, while continuous transforms such as marquees remain untouched.
 - Sandbox preview startup now permits required dependency lifecycle scripts inside the disposable VM, waits up to one minute for the server, and persists detached-server logs on failure.
 - Repository import now accepts the seeded demo workspace ID; ownership enforcement remains the authorization boundary.
 - Workspace status now distinguishes a stopped preview from a live one.

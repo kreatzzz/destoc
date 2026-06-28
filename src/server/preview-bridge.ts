@@ -319,17 +319,17 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   // idle. Limit the fallback to that exact pattern so ongoing transforms such
   // as marquees, parallax, and other animation loops remain untouched.
   function revealStalledMotion() {
-    if (!enabled) return;
     const candidates = document.querySelectorAll("[style]");
     for (const element of candidates) {
       if (!(element instanceof HTMLElement)) continue;
       if (element.closest("[aria-hidden=\\\"true\\\"]")) continue;
+      if (element.closest("dialog,[popover],[data-state=closed],[data-radix-popper-content-wrapper]")) continue;
       const styles = window.getComputedStyle(element);
       if (styles.opacity !== "0" || styles.visibility === "hidden") continue;
-      if (styles.filter === "none") continue;
+      if (styles.filter === "none" && styles.transform === "none") continue;
 
       const rect = element.getBoundingClientRect();
-      const isVisible = rect.width > 2 && rect.height > 2 && rect.bottom > -80 && rect.top < window.innerHeight + 80;
+      const isVisible = rect.width > 2 && rect.height > 2 && rect.bottom > -120 && rect.top < window.innerHeight + 120;
       if (!isVisible) continue;
 
       element.setAttribute(MOTION_FALLBACK_ATTRIBUTE, "true");
@@ -426,6 +426,7 @@ export function createPreviewBridgeProxyScript(upstreamPort: number): string {
   return String.raw`"use strict";
 const http = require("node:http");
 const net = require("node:net");
+const { Transform } = require("node:stream");
 
 const UPSTREAM_PORT = ${upstreamPort};
 const PROXY_PORT = 3001;
@@ -441,6 +442,9 @@ function requestHeaders(headers) {
   }
   result.host = "127.0.0.1:" + UPSTREAM_PORT;
   result["accept-encoding"] = "identity";
+  result["x-forwarded-host"] = headers.host || "localhost:" + PROXY_PORT;
+  result["x-forwarded-proto"] = "https";
+  result["x-forwarded-port"] = "443";
   return result;
 }
 
@@ -453,12 +457,56 @@ function responseHeaders(headers) {
   return result;
 }
 
-function injectBridge(body) {
-  const html = body.toString("utf8");
+function injectBridge(html) {
   const tag = "<script data-destoc-preview-bridge>" + BRIDGE + "</script>";
   const headClose = html.search(/<\/head\s*>/i);
-  if (headClose !== -1) return Buffer.from(html.slice(0, headClose) + tag + html.slice(headClose));
-  return Buffer.from(tag + html);
+  if (headClose !== -1) return html.slice(0, headClose) + tag + html.slice(headClose);
+  return tag + html;
+}
+
+function bridgeInjector() {
+  const tag = "<script data-destoc-preview-bridge>" + BRIDGE + "</script>";
+  let injected = false;
+  let pending = "";
+  const maxPending = 64 * 1024;
+
+  return new Transform({
+    transform(chunk, _encoding, callback) {
+      if (injected) {
+        callback(null, chunk);
+        return;
+      }
+
+      pending += chunk.toString("utf8");
+      const headClose = pending.search(/<\/head\s*>/i);
+      if (headClose !== -1) {
+        const output = pending.slice(0, headClose) + tag + pending.slice(headClose);
+        pending = "";
+        injected = true;
+        callback(null, Buffer.from(output));
+        return;
+      }
+
+      if (pending.length > maxPending) {
+        injected = true;
+        const output = tag + pending;
+        pending = "";
+        callback(null, Buffer.from(output));
+        return;
+      }
+
+      callback();
+    },
+    flush(callback) {
+      if (!pending) {
+        callback();
+        return;
+      }
+      const output = injected ? pending : injectBridge(pending);
+      pending = "";
+      callback(null, Buffer.from(output));
+    },
+  });
 }
 
 function proxyUpgrade(request, socket, head) {
@@ -496,23 +544,8 @@ const server = http.createServer((request, response) => {
       return;
     }
 
-    const chunks = [];
-    let size = 0;
-    upstreamResponse.on("data", (chunk) => {
-      size += chunk.length;
-      if (size <= 5 * 1024 * 1024) chunks.push(chunk);
-    });
-    upstreamResponse.on("end", () => {
-      if (size > 5 * 1024 * 1024) {
-        response.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
-        response.end("Preview HTML exceeds the design-mode proxy limit.");
-        return;
-      }
-      const body = injectBridge(Buffer.concat(chunks));
-      headers["content-length"] = String(body.length);
-      response.writeHead(upstreamResponse.statusCode || 502, headers);
-      response.end(body);
-    });
+    response.writeHead(upstreamResponse.statusCode || 502, headers);
+    upstreamResponse.pipe(bridgeInjector()).pipe(response);
   });
 
   upstream.on("error", () => {

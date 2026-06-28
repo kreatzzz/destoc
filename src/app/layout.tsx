@@ -4,7 +4,7 @@ import { Agentation } from "agentation";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
-const showAgentation = process.env.NEXT_PUBLIC_SHOW_AGENTATION === "true";
+const showAgentation = process.env.NEXT_PUBLIC_SHOW_AGENTATION !== "false";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

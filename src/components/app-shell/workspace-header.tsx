@@ -84,19 +84,20 @@ export function WorkspaceHeader({
         </Tooltip>
       </div>
 
-      <div className="flex justify-end gap-1">
+      <div className="flex h-full items-center justify-end gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
+              size="icon"
               aria-label={codePaneOpen ? "Hide code changes" : "Show code changes"}
               onClick={onToggleCodePane}
               className={cn(
-                "relative flex size-8 items-center justify-center rounded-xl p-0 text-zinc-500 hover:bg-white/[0.06] hover:text-[#ffd879]",
+                "relative grid size-9 place-items-center rounded-xl p-0 text-zinc-500 hover:bg-white/[0.06] hover:text-[#ffd879]",
                 codePaneOpen && "bg-white/[0.06] text-[#ffd879]",
               )}
             >
-              <span className="pointer-events-none absolute left-1/2 top-1/2 grid size-4 -translate-x-1/2 -translate-y-1/2 place-items-center">
+              <span className="pointer-events-none grid size-5 place-items-center">
                 {codePaneOpen ? <AnimatedPanelLeftCloseIcon size={16} /> : <AnimatedPanelRightOpenIcon size={16} />}
               </span>
               {hasCodeChanges ? <span className="absolute right-1 top-1 size-1.5 rounded-full bg-[#f7ca58]" /> : null}
