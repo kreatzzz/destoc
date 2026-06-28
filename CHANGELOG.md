@@ -68,6 +68,9 @@ All notable project decisions and changes are recorded here.
 - New sandbox sessions now start fresh from repository source instead of replaying older accepted patches, avoiding stale patch carryover and white-screen regressions.
 - Sandbox preview startup now runs dev servers with explicit development-mode environment settings and faster npm install flags.
 - Ready previews that become unreachable are marked stopped so the workspace can automatically queue a fresh preview instead of keeping a dead iframe.
+- The sandbox preview bridge now eagerly normalizes lazy media to load images, iframes, video, and source assets earlier while observing newly inserted media.
+- The sandbox motion fallback now preserves element transforms so continuous animations such as marquees keep running.
+- Fresh workspace chat sessions now center the composer with a minimal heading and animate it back into the bottom composer position once conversation state exists.
 
 ### Deferred
 

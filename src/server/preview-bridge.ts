@@ -334,15 +334,59 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
 
       element.setAttribute(MOTION_FALLBACK_ATTRIBUTE, "true");
       element.style.setProperty("opacity", "1", "important");
-      element.style.setProperty("transform", "none", "important");
       element.style.setProperty("filter", "none", "important");
     }
   }
 
+  function eagerlyLoadMedia(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+    const media = Array.from(scope.querySelectorAll("img, iframe, video, source"));
+    if (root instanceof HTMLElement && root.matches("img, iframe, video, source")) media.unshift(root);
+    for (const element of media) {
+      if (!(element instanceof HTMLElement)) continue;
+      if (element instanceof HTMLImageElement || element instanceof HTMLIFrameElement) {
+        element.loading = "eager";
+        element.setAttribute("loading", "eager");
+      }
+      if (element instanceof HTMLImageElement) {
+        element.decoding = "async";
+        element.fetchPriority = "high";
+        if (element.dataset.src && !element.currentSrc) element.src = element.dataset.src;
+        if (element.dataset.srcset && !element.srcset) element.srcset = element.dataset.srcset;
+      }
+      if (element instanceof HTMLSourceElement && element.dataset.srcset && !element.srcset) {
+        element.srcset = element.dataset.srcset;
+      }
+      if (element instanceof HTMLVideoElement) {
+        element.preload = "auto";
+      }
+      element.setAttribute("data-destoc-eager-load", "true");
+    }
+  }
+
+  function observeLazyMedia() {
+    eagerlyLoadMedia(document);
+    if (typeof MutationObserver === "undefined") return;
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof HTMLElement) eagerlyLoadMedia(node);
+        }
+      }
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
   let motionFallbackTimer = window.setTimeout(revealStalledMotion, 2200);
+  let eagerLoadTimer = window.setTimeout(() => {
+    eagerlyLoadMedia(document);
+    revealStalledMotion();
+  }, 700);
   window.addEventListener("scroll", () => {
     window.clearTimeout(motionFallbackTimer);
     motionFallbackTimer = window.setTimeout(revealStalledMotion, 180);
+    window.clearTimeout(eagerLoadTimer);
+    eagerLoadTimer = window.setTimeout(() => eagerlyLoadMedia(document), 80);
   }, { passive: true, capture: true });
 
   window.addEventListener("message", (event) => {
@@ -377,8 +421,15 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
     updateOverlay(highlightedElement);
     renderMarkers();
   });
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ensureOverlay, { once: true });
-  else ensureOverlay();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      ensureOverlay();
+      observeLazyMedia();
+    }, { once: true });
+  } else {
+    ensureOverlay();
+    observeLazyMedia();
+  }
   post(READY_MESSAGE, { pageUrl: window.location.href });
 })();`;
 

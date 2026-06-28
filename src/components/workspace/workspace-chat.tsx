@@ -89,6 +89,7 @@ export function WorkspaceChat({
     ? selectedElements.findIndex((element) => element.id === activeSelection.id) + 1
     : 0;
   const suggestionsById = new Map(suggestions.map((suggestion) => [suggestion.id, suggestion]));
+  const isFreshSession = messages.length === 0 && !isAuditPending && !auditError;
 
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -127,10 +128,17 @@ export function WorkspaceChat({
         onPointerDown={startResize}
         className="absolute right-0 top-0 z-20 h-full w-2 cursor-col-resize touch-none bg-transparent transition-[background-color] duration-150 hover:bg-[#f7ca58]/20"
       />
-      <MessageScrollerProvider autoScroll defaultScrollPosition="end">
-        <MessageScroller className="min-h-0 flex-1">
-          <MessageScrollerViewport className="px-4 py-4">
-            <MessageScrollerContent className="gap-2.5">
+      <div
+        className={cn(
+          "min-h-0 flex-1 transition-[opacity,transform] duration-300 ease-out",
+          isFreshSession ? "pointer-events-none opacity-0 -translate-y-2" : "opacity-100 translate-y-0",
+        )}
+        aria-hidden={isFreshSession}
+      >
+        <MessageScrollerProvider autoScroll defaultScrollPosition="end">
+          <MessageScroller className="min-h-0 flex-1">
+            <MessageScrollerViewport className="px-4 py-4">
+              <MessageScrollerContent className="gap-2.5">
               {messages.map((chatMessage) => {
                 const isUser = chatMessage.role === "user";
                 const attachedSuggestions = (chatMessage.suggestionIds ?? [])
@@ -235,13 +243,24 @@ export function WorkspaceChat({
                   </Marker>
                 </MessageScrollerItem>
               ) : null}
-            </MessageScrollerContent>
-          </MessageScrollerViewport>
-          <MessageScrollerButton className="bottom-3 border-white/10 bg-[#171715] text-[#f7ca58] hover:bg-[#1f1f1c]" />
-        </MessageScroller>
-      </MessageScrollerProvider>
+              </MessageScrollerContent>
+            </MessageScrollerViewport>
+            <MessageScrollerButton className="bottom-3 border-white/10 bg-[#171715] text-[#f7ca58] hover:bg-[#1f1f1c]" />
+          </MessageScroller>
+        </MessageScrollerProvider>
+      </div>
 
-      <div className="p-3">
+      <div
+        className={cn(
+          "z-10 transition-[padding,transform] duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
+          isFreshSession ? "absolute inset-x-0 top-1/2 -translate-y-1/2 px-5" : "relative translate-y-0 p-3",
+        )}
+      >
+        {isFreshSession ? (
+          <div className="mb-5 text-center">
+            <h2 className="text-balance text-xl font-semibold tracking-[-0.04em] text-zinc-100">What should we improve?</h2>
+          </div>
+        ) : null}
         <div className="mb-2 min-h-7">
           {selectedElements.length ? (
             <div className="flex max-w-full items-center gap-1.5 overflow-hidden">
@@ -283,9 +302,7 @@ export function WorkspaceChat({
                 </span>
               ) : null}
             </div>
-          ) : (
-            <p className="px-1 text-xs leading-7 text-zinc-600">Select components to attach context.</p>
-          )}
+          ) : null}
         </div>
         {activeSelection ? (
           <div className="mb-2 rounded-2xl bg-white/[0.028] p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.045)]">
@@ -317,7 +334,7 @@ export function WorkspaceChat({
             className="max-h-36 min-h-16 resize-none rounded-xl border-0 bg-transparent px-2.5 py-1.5 text-sm leading-6 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
           />
           <div className="flex items-center justify-between px-1 pt-1">
-            <p className="text-[10px] text-zinc-600">⌘ Enter to send</p>
+            <span aria-hidden="true" />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button size="icon-sm" aria-label="Send prompt" disabled={!canSend} onClick={onSendPrompt} className="bg-[#f7ca58] text-[#1b1205] hover:bg-[#ffd879]">
