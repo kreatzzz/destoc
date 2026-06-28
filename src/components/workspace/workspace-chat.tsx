@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   Message,
   MessageContent,
-  MessageHeader,
 } from "@/components/ui/message";
 import {
   MessageScroller,
@@ -144,9 +143,6 @@ export function WorkspaceChat({
                   <MessageScrollerItem key={chatMessage.id} messageId={chatMessage.id} scrollAnchor>
                     <Message align={isUser ? "end" : "start"} className="items-end">
                       <MessageContent>
-                        <MessageHeader className={cn("px-1 pb-0.5 text-[10px] uppercase tracking-[0.14em]", isUser ? "justify-end text-[#a77921]" : "text-[#f7ca58]")}>
-                          {isUser ? "You" : "Destoc"}
-                        </MessageHeader>
                         <Bubble align={isUser ? "end" : "start"} variant={isUser ? "default" : "muted"} className={cn("max-w-[88%]", isUser ? "ml-auto" : "mr-auto")}>
                           <BubbleContent
                             className={cn(
@@ -173,12 +169,6 @@ export function WorkspaceChat({
                                     <p className="truncate text-sm font-medium text-zinc-100">{suggestion.title}</p>
                                     <p className="truncate text-[11px] text-zinc-500">{suggestion.summary}</p>
                                   </div>
-                                  <span className={cn(
-                                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] capitalize",
-                                    suggestion.status === "failed" ? "bg-rose-400/10 text-rose-200" : "bg-[#f7ca58]/10 text-[#ffd879]",
-                                  )}>
-                                    {suggestion.status === "failed" ? "Retry" : "Diff"}
-                                  </span>
                                 </div>
 
                                 {suggestion.status === "failed" ? (
@@ -224,13 +214,10 @@ export function WorkspaceChat({
                     <MessageContent>
                       <Bubble variant="muted" className="max-w-[92%]">
                         <BubbleContent className="rounded-xl border-0 bg-white/[0.035] px-3 py-2 text-sm leading-6 text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]">
-                          <span className="inline-flex items-center gap-2">
-                            <span className="text-zinc-500">Drafting code</span>
-                            <span className="inline-flex items-center gap-1">
-                              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-160ms]" />
-                              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-80ms]" />
-                              <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58]" />
-                            </span>
+                          <span className="inline-flex items-center gap-1" aria-label="Drafting response">
+                            <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-160ms]" />
+                            <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58] [animation-delay:-80ms]" />
+                            <span className="size-1.5 animate-bounce rounded-full bg-[#f7ca58]" />
                           </span>
                         </BubbleContent>
                       </Bubble>
