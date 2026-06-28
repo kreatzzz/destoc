@@ -261,49 +261,47 @@ export function WorkspaceChat({
             <h2 className="text-balance text-xl font-semibold tracking-[-0.04em] text-zinc-100">What should we improve?</h2>
           </div>
         ) : null}
-        <div className="mb-2 min-h-7">
-          {selectedElements.length ? (
-            <div className="flex max-w-full items-center gap-1.5 overflow-hidden">
-              {visibleSelections.map((element) => (
-                <span
-                  key={element.id}
-                  className={cn(
-                    "group inline-flex min-w-0 max-w-[112px] items-center justify-center gap-1.5 rounded-full px-1 py-1 text-center text-[11px] transition-[background-color,color,box-shadow] duration-150",
-                    activeSelection?.id === element.id
-                      ? "bg-[#f7ca58] text-[#1b1205] shadow-[0_0_18px_rgba(247,202,88,0.14)]"
-                      : "bg-[#f7ca58]/10 text-[#ffd879] hover:bg-[#f7ca58]/15",
-                  )}
+        {selectedElements.length ? (
+          <div className="mb-2 flex max-w-full items-center gap-1.5 overflow-hidden">
+            {visibleSelections.map((element) => (
+              <span
+                key={element.id}
+                className={cn(
+                  "group inline-flex min-w-0 max-w-[112px] items-center justify-center gap-1.5 rounded-full px-1 py-1 text-center text-[11px] transition-[background-color,color,box-shadow] duration-150",
+                  activeSelection?.id === element.id
+                    ? "bg-[#f7ca58] text-[#1b1205] shadow-[0_0_18px_rgba(247,202,88,0.14)]"
+                    : "bg-[#f7ca58]/10 text-[#ffd879] hover:bg-[#f7ca58]/15",
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => onActiveSelectionChange(element.id)}
+                  className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 px-1.5 text-current"
                 >
-                  <button
-                    type="button"
-                    onClick={() => onActiveSelectionChange(element.id)}
-                    className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 px-1.5 text-current"
-                  >
-                    <span className="shrink-0 font-mono font-semibold tabular-nums">{selectedElements.findIndex((candidate) => candidate.id === element.id) + 1}</span>
-                    <span className="min-w-0 truncate">{elementLabel(element)}</span>
-                  </button>
-                  {element.note?.trim() ? <span className="size-1 shrink-0 rounded-full bg-current opacity-70" /> : null}
-                  <button
-                    type="button"
-                    aria-label={`Remove ${elementLabel(element)}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRemoveSelection(element.id);
-                    }}
-                    className="inline-flex size-3.5 shrink-0 items-center justify-center text-current/60 transition-colors hover:text-current"
-                  >
-                    <AnimatedXIcon size={12} />
-                  </button>
-                </span>
-              ))}
-              {hiddenSelectionCount ? (
-                <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-white/[0.07] px-2 py-1 text-[11px] text-zinc-400">
-                  +{hiddenSelectionCount}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">{selectedElements.findIndex((candidate) => candidate.id === element.id) + 1}</span>
+                  <span className="min-w-0 truncate">{elementLabel(element)}</span>
+                </button>
+                {element.note?.trim() ? <span className="size-1 shrink-0 rounded-full bg-current opacity-70" /> : null}
+                <button
+                  type="button"
+                  aria-label={`Remove ${elementLabel(element)}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemoveSelection(element.id);
+                  }}
+                  className="inline-flex size-3.5 shrink-0 items-center justify-center text-current/60 transition-colors hover:text-current"
+                >
+                  <AnimatedXIcon size={12} />
+                </button>
+              </span>
+            ))}
+            {hiddenSelectionCount ? (
+              <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-white/[0.07] px-2 py-1 text-[11px] text-zinc-400">
+                +{hiddenSelectionCount}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         {activeSelection ? (
           <div className="mb-2 rounded-2xl bg-white/[0.028] p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.045)]">
             <div className="mb-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-zinc-500">

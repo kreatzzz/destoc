@@ -71,6 +71,7 @@ All notable project decisions and changes are recorded here.
 - The sandbox preview bridge now eagerly normalizes lazy media to load images, iframes, video, and source assets earlier while observing newly inserted media.
 - The sandbox motion fallback now preserves element transforms so continuous animations such as marquees keep running.
 - Fresh workspace chat sessions now center the composer with a minimal heading and animate it back into the bottom composer position once conversation state exists.
+- Workspace chat no longer renders an empty selected-component spacer when no components are attached.
 
 ### Deferred
 
