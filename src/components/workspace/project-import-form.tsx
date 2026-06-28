@@ -19,7 +19,7 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
   }, [router, state.ok, state.projectId]);
 
   return (
-    <form action={action} className="grid gap-4 text-zinc-100" noValidate>
+    <form action={action} className="grid gap-5 text-zinc-100" noValidate>
       <input type="hidden" name="workspaceId" value={workspaceId} />
       <div>
         <p className="text-sm font-medium">Import a public repository</p>
@@ -35,7 +35,7 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
           placeholder="https://github.com/owner/repository"
           required
           aria-invalid={state.ok === false && Boolean(state.message)}
-          className="border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
+          className="h-10 rounded-2xl border-white/10 bg-[#1f1f1a] px-4 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)] placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
         />
       </div>
       <div className="grid gap-2">
@@ -45,7 +45,7 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
           name="defaultBranch"
           defaultValue="main"
           maxLength={255}
-          className="border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
+          className="h-10 rounded-2xl border-white/10 bg-[#1f1f1a] px-4 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)] placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
         />
       </div>
       {state.message ? (
@@ -54,7 +54,7 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
         </p>
       ) : null}
       {state.ok ? <p role="status" className="text-sm text-[#f7ca58]">Repository imported. Opening workspace…</p> : null}
-      <Button type="submit" disabled={isPending} className="bg-[#f7ca58] text-[#1b1205] hover:bg-[#ffd879]">
+      <Button type="submit" disabled={isPending} className="h-11 rounded-2xl bg-[#f7ca58] text-[#1b1205] shadow-[0_14px_34px_rgba(247,202,88,0.12)] hover:bg-[#ffd879]">
         {isPending ? "Importing…" : "Import repository"}
       </Button>
     </form>

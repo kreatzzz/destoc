@@ -41,7 +41,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for the Coolify/Docker runbook. The app ships
 - Public HTTPS GitHub repository URLs are the only accepted source type. No GitHub token or repository write access is used.
 - Sandbox/review/mutation/auth requests are rate limited. Production should use Upstash; a single-instance home-server deploy can explicitly enable the process-local fallback with `ALLOW_IN_MEMORY_RATE_LIMIT="true"`.
 - Suggested patches are limited to one selected UI file under `src/app` or `src/components`; environment files, package files, lockfiles, and traversal paths are rejected.
-- Vercel Sandbox credentials stay in the host process. Imported code receives no application credentials, and its egress is denied after dependency installation.
+- Vercel Sandbox credentials stay in the host process. Imported code receives no application credentials. Runtime preview egress is allowed so real websites can load public fonts, images, CDNs, and embeds.
 
 ## Environment
 
@@ -76,4 +76,5 @@ The example pins Destoc to `gpt-5.4` with medium reasoning without changing your
 
 - The deterministic mock provider remains the safest free default. Local OpenAI-compatible and command providers are available for experiments, and the DeepSeek provider boundary exists, but the production DeepSeek integration is not yet implemented.
 - Only common public Next.js/Vite-style repositories are in scope. Private repositories, GitHub OAuth, GitHub write-back/PRs, webhooks, and scheduled reviews are deferred.
-- `DESIGN.md` is intentionally deferred until core product work is approved, per project guidance.
+- Accepted changes apply to the currently running sandbox only. A new sandbox session intentionally starts from clean repository source.
+- `ai-transcripts/` contains the assignment transcript summary package; raw tool exports can be added there after redaction.

@@ -96,10 +96,10 @@ export async function probeSandboxRunHealth(userId: string, projectId: string, s
       signal: AbortSignal.timeout(4_000),
     });
 
-    if (response.status === 410 || response.status === 404) {
+    if (response.status === 410 || response.status === 404 || response.status >= 600) {
       const stoppedRun = await transitionSandboxRun(userId, run.id, "STOPPED", {
         errorCode: "SANDBOX_STOPPED",
-        errorMessage: "The sandbox preview has expired. Start a new preview to continue.",
+        errorMessage: "The sandbox preview is no longer reachable. Destoc will start a fresh preview.",
       });
       return { sandboxRun: stoppedRun, reachable: false, stopped: true, httpStatus: response.status };
     }
@@ -111,7 +111,11 @@ export async function probeSandboxRunHealth(userId: string, projectId: string, s
       httpStatus: response.status,
     };
   } catch {
-    return { sandboxRun: run, reachable: false, stopped: false };
+    const stoppedRun = await transitionSandboxRun(userId, run.id, "STOPPED", {
+      errorCode: "SANDBOX_UNREACHABLE",
+      errorMessage: "The sandbox preview is no longer reachable. Destoc will start a fresh preview.",
+    });
+    return { sandboxRun: stoppedRun, reachable: false, stopped: true };
   }
 }
 

@@ -47,11 +47,11 @@ export function ProjectList({ projects }: ProjectListProps) {
       {projects.map((project) => (
         <article
           key={project.id}
-          className="group relative overflow-hidden rounded-2xl bg-white/[0.045] p-1 shadow-[0_0_0_1px_rgba(255,255,255,0.07)] transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:bg-white/[0.065] hover:shadow-[0_0_0_1px_rgba(247,202,88,0.24),0_16px_44px_rgba(0,0,0,0.28)]"
+          className="group relative overflow-hidden rounded-[22px] bg-[#1f1f1a] p-1 shadow-[0_0_0_1px_rgba(255,255,255,0.065),0_12px_28px_rgba(0,0,0,0.18)] transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:bg-[#24241f] hover:shadow-[0_0_0_1px_rgba(247,202,88,0.24),0_18px_48px_rgba(0,0,0,0.3)]"
         >
-          <div className="flex items-center gap-4 rounded-[calc(1rem-4px)] px-4 py-3">
+          <div className="flex items-center gap-4 rounded-[18px] px-4 py-4">
             <Link href={`/workspace/${project.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-black/35 text-[#f7ca58] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-black/35 text-[#f7ca58] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.055)]">
                 <AnimatedFolderOpenIcon size={17} />
               </span>
               <span className="min-w-0">

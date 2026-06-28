@@ -12,7 +12,6 @@ import { transitionRevision } from "@/server/revisions";
 // for the maximum Hobby-safe window so a reviewer is not interrupted mid-audit.
 const SANDBOX_TIMEOUT_MS = 45 * 60 * 1_000;
 const INSTALL_TIMEOUT_MS = 4 * 60 * 1_000;
-const BUILD_TIMEOUT_MS = 3 * 60 * 1_000;
 const PREVIEW_START_TIMEOUT_MS = SANDBOX_TIMEOUT_MS - 60_000;
 const PREVIEW_HEALTH_CHECK_TIMEOUT_MS = 60_000;
 const MAX_PERSISTED_LOG_LENGTH = 20_000;
@@ -332,20 +331,6 @@ async function applyPatchToSandbox(sandbox: Sandbox, patch: string): Promise<str
   return truncateLog(`git apply needed fallback:\n${checkLog}\n${fallbackLog}`);
 }
 
-async function acceptedRevisionPatches(projectId: string, revisionId?: string): Promise<string[]> {
-  const revisions = await getPrisma().revision.findMany({
-    where: {
-      projectId,
-      status: "READY",
-      id: revisionId ? { not: revisionId } : undefined,
-    },
-    orderBy: { createdAt: "asc" },
-    select: { patch: true },
-  });
-
-  return revisions.map((revision) => revision.patch).filter((patch) => patch.trim().length > 0);
-}
-
 function previewStartCommand(nextProject: boolean, scripts: PackageScripts): string {
   if (nextProject && !scripts.dev) {
     return `exec npm run start -- -H 0.0.0.0 -p 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
@@ -364,9 +349,9 @@ function previewStartCommand(nextProject: boolean, scripts: PackageScripts): str
  *
  * The implementation intentionally uses only static shell programs. Repository
  * metadata is passed to the SDK as structured source fields rather than being
- * interpolated into a shell command. Network access is restricted to GitHub
- * and package registries during clone/install and then denied before the user
- * application starts.
+ * interpolated into a shell command. Host credentials never enter the VM. The
+ * runtime preview allows public egress so real websites can load their fonts,
+ * images, analytics shims, and embeds instead of rendering as partial shells.
  */
 export async function executeSandboxRun(
   userId: string,
@@ -396,7 +381,7 @@ export async function executeSandboxRun(
       // remains reachable solely over localhost inside the VM.
       ports: [3001],
       runtime: "node24",
-      env: { NODE_ENV: "production" },
+      env: { NODE_ENV: "development" },
       resources: { vcpus: 1 },
       timeout: SANDBOX_TIMEOUT_MS,
       persistent: false,
@@ -417,18 +402,6 @@ export async function executeSandboxRun(
       );
     }
 
-    const cumulativePatches = await acceptedRevisionPatches(project.id, input.revisionId);
-    if (cumulativePatches.length) {
-      logs = appendLog(logs || `Provisioned sandbox ${sandbox.name}.`, `Replaying ${cumulativePatches.length} accepted change${cumulativePatches.length === 1 ? "" : "s"}.`);
-      await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-
-      for (const [index, patch] of cumulativePatches.entries()) {
-        const patchLog = await applyPatchToSandbox(sandbox, patch);
-        logs = appendLog(logs, `Accepted change ${index + 1}/${cumulativePatches.length}:\n${patchLog}`);
-        await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-      }
-    }
-
     if (input.patch) {
       logs = appendLog(logs || `Provisioned sandbox ${sandbox.name}.`, "Applying requested patch.");
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
@@ -446,7 +419,7 @@ export async function executeSandboxRun(
         // Dependency lifecycle scripts are required by a number of legitimate
         // web projects. They run only inside the disposable microVM, before
         // app execution, with no host credentials and tightly scoped egress.
-        "if [ -f package-lock.json ]; then npm ci; else npm install; fi",
+        "if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi",
       ],
       // Production previews still need devDependencies to build source apps
       // (PostCSS, TypeScript, bundler plugins, etc.). The serving process is
@@ -463,24 +436,6 @@ export async function executeSandboxRun(
       });
     }
 
-    if (nextProject && !scripts.dev) {
-      logs = appendLog(logs, "Building production preview.");
-      await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-      const build = await sandbox.runCommand({
-        cmd: "npm",
-        args: ["run", "build"],
-        cwd: sandbox.cwd,
-        timeoutMs: BUILD_TIMEOUT_MS,
-      });
-      const buildLog = await commandLog(build);
-      logs = appendLog(logs, `Production build:\n${buildLog}`);
-      if (build.exitCode !== 0) {
-        throw new AppError("VALIDATION_ERROR", "This repository could not build inside the preview sandbox. Check the build log for missing environment variables or unsupported build steps.", {
-          cause: buildLog,
-        });
-      }
-    }
-
     // The untrusted application never receives application credentials. At
     // preview runtime we allow public egress so real websites can load remote
     // image/CDN/font assets instead of rendering half-empty inside the iframe.
@@ -495,6 +450,7 @@ export async function executeSandboxRun(
         previewStartCommand(nextProject, scripts),
       ],
       cwd: sandbox.cwd,
+      env: { NODE_ENV: "development", HOST: "0.0.0.0", PORT: "3000", BROWSER: "none" },
       detached: true,
       timeoutMs: PREVIEW_START_TIMEOUT_MS,
     });

@@ -3,7 +3,7 @@
 ## In progress
 
 - [ ] Configure a live DeepSeek provider and validate structured reviews against real component evidence.
-- [ ] Validate preview startup across framework/package-manager variants and add persisted screenshot capture.
+- [ ] Validate preview startup across more framework/package-manager variants and add persisted screenshot capture.
 - [ ] Add a repository capability scanner so non-web imports are flagged before users start a sandbox.
 - [ ] Add per-project runtime host/env allowlists for previews that legitimately depend on third-party services.
 - [ ] Move sandbox execution to a durable background worker/workflow before production deployment; the current async queue is optimized for the local take-home/demo flow.
@@ -25,3 +25,5 @@
 - [x] Provide a local Docker PostgreSQL service, committed initial migration, and seedable demo account.
 - [x] Add liveness-aware sandbox reload/restart behavior, production Next.js previews, tooltips, and functional workspace controls.
 - [x] Replace the three-pane workspace with chat/context pills plus full-space preview and async sandbox progress polling.
+- [x] Add the assignment `ai-transcripts/` package with AI usage summary and curated session notes.
+- [x] Make new sandbox sessions start fresh from repository source instead of replaying older accepted patches.

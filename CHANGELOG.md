@@ -56,8 +56,13 @@ All notable project decisions and changes are recorded here.
 - Workspace chat now uses the new shadcn `MessageScroller`, `Message`, and `Bubble` primitives, adds the related shadcn chat primitives to the UI library, and applies the Mobbin-backed direction of quiet rails, compact cards, and a stronger composer surface.
 - Workspace shell now groups repository content in a warm tinted panel, rounds the connected-project summary, aligns top-bar icons with animated lucide icons, and compacts chat/update surfaces.
 - Workspace chat now separates user and Destoc messages more clearly, removes accepted checkmark confirmation cards, streams acceptance/completion text, and keeps accepted diffs across prompts.
-- Sandbox previews now require an editable `dev` script, use clearer incompatible-repository errors, allow public runtime egress so external assets can render, and replay accepted patches when starting a fresh sandbox.
+- Sandbox previews now require an editable `dev` script, use clearer incompatible-repository errors, and allow public runtime egress so external assets can render.
 - Failed patch applications now return suggestions to a retryable state instead of leaving them visually accepted.
+- Added the assignment `ai-transcripts/` package with an AI usage summary, curated Codex session notes, Cursor/page-feedback notes, and OpenCode link placeholder.
+- The `/workspace` repository dashboard now uses a more structured warm container system around the existing content without changing the page copy.
+- New sandbox sessions now start fresh from repository source instead of replaying older accepted patches, avoiding stale patch carryover and white-screen regressions.
+- Sandbox preview startup now runs dev servers with explicit development-mode environment settings and faster npm install flags.
+- Ready previews that become unreachable are marked stopped so the workspace can automatically queue a fresh preview instead of keeping a dead iframe.
 
 ### Deferred
 

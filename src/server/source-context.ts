@@ -1,6 +1,4 @@
 import type { Project, ReviewTarget, SelectedElement } from "@/generated/prisma/client";
-import { getPrisma } from "@/lib/db";
-import { normalizeUnifiedDiff } from "@/server/patches";
 
 export type SourceCandidate = {
   path: string;
@@ -319,116 +317,6 @@ async function fetchText(url: string): Promise<string | null> {
   return text.slice(0, maxContentLength);
 }
 
-export function applyUnifiedDiffToCandidates(candidates: SourceCandidate[], patch: string): boolean {
-  const lines = normalizeUnifiedDiff(patch).split("\n");
-  let applied = false;
-  let currentPath: string | null = null;
-  let oldLines: string[] = [];
-  let newLines: string[] = [];
-  let removedLines: string[] = [];
-  let addedLines: string[] = [];
-
-  function flushHunk() {
-    if (!currentPath || oldLines.length === 0) {
-      oldLines = [];
-      newLines = [];
-      removedLines = [];
-      addedLines = [];
-      return;
-    }
-
-    const candidate = candidates.find((item) => item.path === currentPath);
-    if (!candidate) {
-      oldLines = [];
-      newLines = [];
-      removedLines = [];
-      addedLines = [];
-      return;
-    }
-
-    const oldBlock = oldLines.join("\n");
-    const newBlock = newLines.join("\n");
-    if (candidate.content.includes(oldBlock)) {
-      candidate.content = candidate.content.replace(oldBlock, newBlock);
-      applied = true;
-    } else if (newBlock.length > 0 && candidate.content.includes(newBlock)) {
-      applied = true;
-    } else if (removedLines.length === addedLines.length && removedLines.length > 0) {
-      for (let index = 0; index < removedLines.length; index += 1) {
-        const removedLine = removedLines[index]!;
-        const addedLine = addedLines[index]!;
-        if (candidate.content.includes(addedLine)) {
-          applied = true;
-          continue;
-        }
-        if (!candidate.content.includes(removedLine)) continue;
-        candidate.content = candidate.content.replace(removedLine, addedLine);
-        applied = true;
-      }
-    } else if (addedLines.length === 0) {
-      for (const removedLine of removedLines) {
-        const withTrailingNewline = `${removedLine}\n`;
-        if (candidate.content.includes(withTrailingNewline)) {
-          candidate.content = candidate.content.replace(withTrailingNewline, "");
-          applied = true;
-        } else if (candidate.content.includes(removedLine)) {
-          candidate.content = candidate.content.replace(removedLine, "");
-          applied = true;
-        }
-      }
-    }
-
-    oldLines = [];
-    newLines = [];
-    removedLines = [];
-    addedLines = [];
-  }
-
-  for (const line of lines) {
-    if (line.startsWith("+++ b/")) {
-      flushHunk();
-      currentPath = line.slice("+++ b/".length).trim();
-      continue;
-    }
-
-    if (line.startsWith("@@")) {
-      flushHunk();
-      continue;
-    }
-
-    if (!currentPath || line.startsWith("--- ") || line.startsWith("diff --git ") || line.startsWith("index ")) continue;
-    if (line.startsWith("-")) {
-      oldLines.push(line.slice(1));
-      removedLines.push(line.slice(1));
-    } else if (line.startsWith("+")) {
-      newLines.push(line.slice(1));
-      addedLines.push(line.slice(1));
-    }
-    else if (line.startsWith(" ")) {
-      oldLines.push(line.slice(1));
-      newLines.push(line.slice(1));
-    }
-  }
-
-  flushHunk();
-  return applied;
-}
-
-async function applyAcceptedPatches(projectId: string, candidates: SourceCandidate[]) {
-  const revisions = await getPrisma().revision.findMany({
-    where: { projectId, status: "READY" },
-    orderBy: { createdAt: "asc" },
-    select: { patch: true },
-  });
-
-  let appliedCount = 0;
-  for (const revision of revisions) {
-    if (applyUnifiedDiffToCandidates(candidates, revision.patch)) appliedCount += 1;
-  }
-
-  return appliedCount;
-}
-
 export async function sourceContextForReview(
   project: Project,
   target: ReviewTarget & { element: SelectedElement | null },
@@ -466,12 +354,11 @@ export async function sourceContextForReview(
     .sort((a, b) => b.score - a.score)
     .slice(0, maxCandidates)
     .map(({ path, content }) => ({ path, content }));
-  const appliedAcceptedPatchCount = await applyAcceptedPatches(project.id, candidates);
 
   return {
     candidates,
     note: candidates.length
-      ? `Fetched ${candidates.length} bounded source candidates from GitHub for patch generation.${appliedAcceptedPatchCount ? ` Applied ${appliedAcceptedPatchCount} accepted patch${appliedAcceptedPatchCount === 1 ? "" : "es"} to match the current sandbox state.` : ""}`
+      ? `Fetched ${candidates.length} bounded source candidates from GitHub for patch generation.`
       : "Source files were discovered but their contents could not be fetched.",
   };
 }

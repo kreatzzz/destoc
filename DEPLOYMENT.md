@@ -97,5 +97,5 @@ After deploy:
 
 - DeepSeek is not wired yet; setting `DESIGN_REVIEW_PROVIDER="deepseek"` currently fails by design.
 - Vercel Sandbox credentials are still required for previewing imported repositories.
-- Accepted suggestions are persisted and queued, but the full revision rebuild worker remains a deferred production task.
+- Accepted suggestions are persisted for audit/history and apply to the currently running sandbox only. New sandbox sessions intentionally start from clean repository source.
 - The command provider depends on a CLI binary and authenticated session in the runtime container; your local Codex desktop session is not automatically available on Coolify.
