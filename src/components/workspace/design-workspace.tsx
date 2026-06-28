@@ -149,17 +149,10 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   const [previewError, setPreviewError] = useState<string | null>(data.preview?.errorMessage ?? null);
   const [isPreviewStarting, setIsPreviewStarting] = useState(activeSandboxStatuses.has(data.preview?.status));
   const [selectedElements, setSelectedElements] = useState<WorkspaceSelectedElement[]>([]);
-  const [suggestions, setSuggestions] = useState<WorkspaceSuggestion[]>(data.suggestions);
+  const [suggestions, setSuggestions] = useState<WorkspaceSuggestion[]>([]);
   const [activeSelectionId, setActiveSelectionId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
-  const [messages, setMessages] = useState<WorkspaceChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: "Select components in the preview, then ask for a design audit or improvement plan. I’ll keep the selected components as context.",
-      suggestionIds: data.suggestions.filter((suggestion) => suggestion.patch?.trim()).map((suggestion) => suggestion.id),
-    },
-  ]);
+  const [messages, setMessages] = useState<WorkspaceChatMessage[]>([]);
   const [isAuditPending, setIsAuditPending] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [pendingSuggestionId, setPendingSuggestionId] = useState<string | null>(null);

@@ -1,22 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { DesignWorkspace } from "@/components/workspace/design-workspace";
-import type { ReviewStatus, WorkspaceData } from "@/components/workspace/types";
+import type { WorkspaceData } from "@/components/workspace/types";
 import { getCurrentUser } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
 import { getProject } from "@/server";
-
-function toSuggestionStatus(status: string): ReviewStatus {
-  if (status === "ACCEPTED") return "accepted";
-  if (status === "REJECTED") return "rejected";
-  if (status === "FAILED") return "failed";
-  return "pending";
-}
-
-function toChecklist(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string");
-}
 
 export default async function ProjectWorkspacePage({ params }: { params: Promise<{ projectId: string }> }) {
   const user = await getCurrentUser();
@@ -27,13 +15,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
     if (error instanceof AppError && error.code === "NOT_FOUND") notFound();
     throw error;
   });
-  const latestReview = project.reviews[0];
   const latestSandboxRun = project.sandboxRuns[0];
-  const persistedSuggestions = [
-    ...project.reviews.flatMap((review) => review.suggestions).filter((suggestion) => suggestion.status === "ACCEPTED"),
-    ...(latestReview?.suggestions.filter((suggestion) => suggestion.status !== "ACCEPTED") ?? []),
-  ];
-  const uniqueSuggestions = Array.from(new Map(persistedSuggestions.map((suggestion) => [suggestion.id, suggestion])).values());
   const data: WorkspaceData = {
     project: {
       id: project.id,
@@ -50,16 +32,10 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
       createdAt: revision.createdAt.toLocaleString(),
       isActive: index === 0,
     })),
-    suggestions: uniqueSuggestions.map((suggestion) => ({
-      id: suggestion.id,
-      title: suggestion.title,
-      summary: suggestion.issue,
-      rationale: suggestion.rationale,
-      impact: suggestion.severity === "high" ? "High impact" : suggestion.severity === "medium" ? "Medium impact" : "Low impact",
-      status: toSuggestionStatus(suggestion.status),
-      patch: suggestion.patch,
-      verificationChecklist: toChecklist(suggestion.verificationChecklist),
-    })),
+    // A workspace open is a fresh design session. Historical reviews remain in
+    // the database for audit/history, but old suggestion cards should not
+    // reappear in the live chat or code pane after a sandbox restart.
+    suggestions: [],
     preview: latestSandboxRun
       ? {
           runId: latestSandboxRun.id,
