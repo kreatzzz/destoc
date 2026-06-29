@@ -20,6 +20,9 @@ All notable project decisions and changes are recorded here.
 
 ### Changed
 
+- The workspace manager now uses a compact Vercel-like shell with a thin navigation bar, dense repository rows, restrained radii, explicit dividers, and a focused import panel that adapts cleanly to narrow screens.
+- Next.js sandbox previews now build and run in production mode so failed development HMR WebSockets cannot block React hydration, interactions, or animation effects; accepted changes rebuild and restart the production preview automatically.
+- Preview media recovery is now limited to near-viewport lazy images after the page load event and no longer overrides repository opacity, filter, or fetch-priority behavior.
 - Agentation is visible in development by default again, and the Next.js dev indicator is restored for local project feedback.
 - The preview bridge now injects the design-mode bridge through a streaming transform instead of buffering full HTML, improving reliability for streaming and client-heavy pages.
 - Stalled entrance-motion elements are recovered in normal preview mode as well as design mode, while continuous transforms such as marquees remain untouched.

@@ -29,7 +29,7 @@ export function WorkspaceLogoutButton() {
       variant="ghost"
       onClick={() => void signOut()}
       disabled={isPending}
-      className="h-9 gap-2 rounded-xl px-2.5 text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"
+      className="h-10 gap-2 rounded-md px-2.5 text-xs text-zinc-500 transition-[background-color,color,scale] duration-150 ease-out hover:bg-white/[0.06] hover:text-zinc-200 active:scale-[0.96]"
     >
       <span className="grid size-5 place-items-center">
         {isPending ? <Loader2 className="size-4 animate-spin" /> : <AnimatedLogoutIcon size={17} />}

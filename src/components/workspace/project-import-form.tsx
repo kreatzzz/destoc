@@ -19,14 +19,14 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
   }, [router, state.ok, state.projectId]);
 
   return (
-    <form action={action} className="grid gap-5 text-zinc-100" noValidate>
+    <form action={action} className="grid gap-4 text-zinc-100" noValidate>
       <input type="hidden" name="workspaceId" value={workspaceId} />
       <div>
-        <p className="text-sm font-medium">Import a public repository</p>
-        <p className="mt-1 text-sm leading-6 text-zinc-500">Destoc stores repository metadata only. Repository execution remains isolated from application credentials.</p>
+        <p className="text-sm font-medium tracking-[-0.01em]">Import repository</p>
+        <p className="mt-1 text-pretty text-xs leading-5 text-zinc-500">Connect a public GitHub repository. Execution stays isolated from application credentials.</p>
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor="github-url" className="text-zinc-300">GitHub repository URL</Label>
+      <div className="grid gap-1.5">
+        <Label htmlFor="github-url" className="text-xs text-zinc-400">Repository URL</Label>
         <Input
           id="github-url"
           name="githubUrl"
@@ -35,26 +35,26 @@ export function ProjectImportForm({ workspaceId }: { workspaceId: string }) {
           placeholder="https://github.com/owner/repository"
           required
           aria-invalid={state.ok === false && Boolean(state.message)}
-          className="h-10 rounded-2xl border-white/10 bg-[#1f1f1a] px-4 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)] placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
+          className="h-9 rounded-md border-white/10 bg-[#0a0a0a] px-3 text-sm text-zinc-100 placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
         />
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor="branch" className="text-zinc-300">Branch</Label>
+      <div className="grid gap-1.5">
+        <Label htmlFor="branch" className="text-xs text-zinc-400">Branch</Label>
         <Input
           id="branch"
           name="defaultBranch"
           defaultValue="main"
           maxLength={255}
-          className="h-10 rounded-2xl border-white/10 bg-[#1f1f1a] px-4 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)] placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
+          className="h-9 rounded-md border-white/10 bg-[#0a0a0a] px-3 text-sm text-zinc-100 placeholder:text-zinc-700 focus-visible:border-[#f7ca58]/50 focus-visible:ring-[#f7ca58]/20"
         />
       </div>
       {state.message ? (
-        <p role="alert" className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm leading-5 text-rose-200">
+        <p role="alert" className="rounded-md bg-rose-500/10 px-3 py-2 text-xs leading-5 text-rose-200">
           {state.message}
         </p>
       ) : null}
-      {state.ok ? <p role="status" className="text-sm text-[#f7ca58]">Repository imported. Opening workspace…</p> : null}
-      <Button type="submit" disabled={isPending} className="h-11 rounded-2xl bg-[#f7ca58] text-[#1b1205] shadow-[0_14px_34px_rgba(247,202,88,0.12)] hover:bg-[#ffd879]">
+      {state.ok ? <p role="status" className="text-xs text-[#f7ca58]">Repository imported. Opening workspace…</p> : null}
+      <Button type="submit" disabled={isPending} className="h-9 rounded-md bg-[#f7ca58] text-sm text-[#1b1205] transition-[background-color,scale] duration-150 ease-out hover:bg-[#ffd879] active:scale-[0.96]">
         {isPending ? "Importing…" : "Import repository"}
       </Button>
     </form>

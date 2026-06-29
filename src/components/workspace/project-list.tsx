@@ -43,38 +43,38 @@ function statusClassName(status: WorkspaceProjectListItem["previewStatus"]) {
 
 export function ProjectList({ projects }: ProjectListProps) {
   return (
-    <section className="grid content-start gap-3">
+    <section className="divide-y divide-white/[0.07]">
       {projects.map((project) => (
         <article
           key={project.id}
-          className="group relative overflow-hidden rounded-[22px] bg-[#1f1f1a] p-1 shadow-[0_0_0_1px_rgba(255,255,255,0.065),0_12px_28px_rgba(0,0,0,0.18)] transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:bg-[#24241f] hover:shadow-[0_0_0_1px_rgba(247,202,88,0.24),0_18px_48px_rgba(0,0,0,0.3)]"
+          className="group relative bg-transparent transition-[background-color] duration-150 ease-out hover:bg-white/[0.035]"
         >
-          <div className="flex items-center gap-4 rounded-[18px] px-4 py-4">
+          <div className="flex min-h-16 items-center gap-3 px-3 py-2.5 sm:px-4">
             <Link href={`/workspace/${project.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-black/35 text-[#f7ca58] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.055)]">
-                <AnimatedFolderOpenIcon size={17} />
+              <span className="grid size-9 shrink-0 place-items-center rounded-md bg-white/[0.045] text-zinc-400 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)] transition-[color,background-color] duration-150 ease-out group-hover:bg-[#f7ca58]/10 group-hover:text-[#f7ca58]">
+                <AnimatedFolderOpenIcon size={16} />
               </span>
               <span className="min-w-0">
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-sm font-medium tracking-[-0.02em] text-zinc-100">{project.name}</span>
+                  <span className="truncate text-sm font-medium tracking-[-0.01em] text-zinc-200 group-hover:text-zinc-50">{project.name}</span>
                   <span className={cn("size-1.5 shrink-0 rounded-full", statusClassName(project.previewStatus))} />
                 </span>
-                <span className="mt-1 block truncate text-xs text-zinc-500">{project.repository}</span>
+                <span className="mt-0.5 block truncate text-xs text-zinc-600">{project.repository}</span>
               </span>
             </Link>
 
-            <div className="hidden items-center gap-2 md:flex">
-              <Badge variant="outline" className="border-white/10 bg-black/20 text-zinc-400">
+            <div className="hidden items-center gap-1.5 md:flex">
+              <Badge variant="outline" className="h-6 rounded-md border-white/[0.08] bg-transparent px-2 text-[11px] font-normal text-zinc-500">
                 {project.previewStatus ? statusCopy[project.previewStatus] : "Not started"}
               </Badge>
-              <Badge variant="outline" className="border-white/10 bg-black/20 text-zinc-400">
+              <Badge variant="outline" className="h-6 rounded-md border-white/[0.08] bg-transparent px-2 text-[11px] font-normal tabular-nums text-zinc-500">
                 {project.reviewCount} reviews
               </Badge>
             </div>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button asChild variant="ghost" size="icon-sm" className="text-zinc-500 hover:bg-white/[0.08] hover:text-zinc-100">
+                <Button asChild variant="ghost" size="icon-sm" className="size-10 rounded-md text-zinc-600 transition-[color,background-color,scale] duration-150 ease-out hover:bg-white/[0.06] hover:text-zinc-200 active:scale-[0.96]">
                   <Link href={`/workspace/${project.id}`} aria-label={`Open ${project.name}`}>
                     <AnimatedArrowUpRightIcon size={14} />
                   </Link>

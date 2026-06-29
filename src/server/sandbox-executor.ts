@@ -12,6 +12,7 @@ import { transitionRevision } from "@/server/revisions";
 // for the maximum Hobby-safe window so a reviewer is not interrupted mid-audit.
 const SANDBOX_TIMEOUT_MS = 45 * 60 * 1_000;
 const INSTALL_TIMEOUT_MS = 4 * 60 * 1_000;
+const BUILD_TIMEOUT_MS = 4 * 60 * 1_000;
 const PREVIEW_START_TIMEOUT_MS = SANDBOX_TIMEOUT_MS - 60_000;
 const PREVIEW_HEALTH_CHECK_TIMEOUT_MS = 60_000;
 const MAX_PERSISTED_LOG_LENGTH = 20_000;
@@ -331,17 +332,83 @@ async function applyPatchToSandbox(sandbox: Sandbox, patch: string): Promise<str
   return truncateLog(`git apply needed fallback:\n${checkLog}\n${fallbackLog}`);
 }
 
-function previewStartCommand(nextProject: boolean, scripts: PackageScripts): string {
-  if (nextProject && !scripts.dev) {
-    return `exec npm run start -- -H 0.0.0.0 -p 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
-  }
-
+export function previewStartCommand(nextProject: boolean, scripts: PackageScripts): string {
   if (nextProject) {
-    return `exec npm run dev -- --hostname 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
+    return `exec npm run start -- -H 0.0.0.0 -p 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
   }
 
   const scriptName = scripts.dev ? "dev" : "start";
   return `HOST=0.0.0.0 PORT=3000 exec npm run ${scriptName} -- --host 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
+}
+
+function previewEnvironment(nextProject: boolean) {
+  return {
+    NODE_ENV: nextProject ? "production" : "development",
+    HOST: "0.0.0.0",
+    PORT: "3000",
+    BROWSER: "none",
+  };
+}
+
+function validatePreviewScripts(nextProject: boolean, scripts: PackageScripts) {
+  if (nextProject && (!scripts.build || !scripts.start)) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "This Next.js repository must define npm build and start scripts to run an interactive preview.",
+    );
+  }
+
+  if (!nextProject && !scripts.dev && !scripts.start) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "This repository must define an npm dev or start script to run an interactive preview.",
+    );
+  }
+}
+
+async function buildNextPreview(sandbox: Sandbox): Promise<string> {
+  const build = await sandbox.runCommand({
+    cmd: "npm",
+    args: ["run", "build"],
+    cwd: sandbox.cwd,
+    env: { NODE_ENV: "production" },
+    timeoutMs: BUILD_TIMEOUT_MS,
+  });
+  const buildLog = await commandLog(build);
+
+  if (build.exitCode !== 0) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "This Next.js repository could not create a production preview build. It may require environment variables or services that are not available in the sandbox.",
+      { cause: buildLog },
+    );
+  }
+
+  return buildLog;
+}
+
+async function startProjectPreview(sandbox: Sandbox, nextProject: boolean, scripts: PackageScripts) {
+  await sandbox.runCommand({
+    cmd: "sh",
+    args: ["-lc", previewStartCommand(nextProject, scripts)],
+    cwd: sandbox.cwd,
+    env: previewEnvironment(nextProject),
+    detached: true,
+    timeoutMs: PREVIEW_START_TIMEOUT_MS,
+  });
+}
+
+async function restartNextPreview(sandbox: Sandbox, scripts: PackageScripts) {
+  await sandbox.runCommand({
+    cmd: "sh",
+    args: [
+      "-lc",
+      "pkill -TERM -f '[n]ext start' 2>/dev/null || true; pkill -TERM -f '[n]pm run start' 2>/dev/null || true; sleep 1",
+    ],
+    cwd: sandbox.cwd,
+    timeoutMs: 5_000,
+  });
+  await startProjectPreview(sandbox, true, scripts);
 }
 
 /**
@@ -395,12 +462,7 @@ export async function executeSandboxRun(
 
     const scripts = await packageScripts(sandbox);
     const nextProject = await isNextProject(sandbox);
-    if (!scripts.dev) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "This repository does not define an npm dev script. Destoc needs a dev server so accepted code changes can update the live preview.",
-      );
-    }
+    validatePreviewScripts(nextProject, scripts);
 
     if (input.patch) {
       logs = appendLog(logs || `Provisioned sandbox ${sandbox.name}.`, "Applying requested patch.");
@@ -441,26 +503,23 @@ export async function executeSandboxRun(
     // image/CDN/font assets instead of rendering half-empty inside the iframe.
     await sandbox.updateNetworkPolicy("allow-all");
 
-    logs = appendLog(logs, "Starting preview server.");
+    if (nextProject) {
+      logs = appendLog(logs, "Building production preview.");
+      await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+      const buildLog = await buildNextPreview(sandbox);
+      logs = appendLog(logs, buildLog);
+    }
+
+    logs = appendLog(logs, "Starting interactive preview server.");
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-    await sandbox.runCommand({
-      cmd: "sh",
-      args: [
-        "-lc",
-        previewStartCommand(nextProject, scripts),
-      ],
-      cwd: sandbox.cwd,
-      env: { NODE_ENV: "development", HOST: "0.0.0.0", PORT: "3000", BROWSER: "none" },
-      detached: true,
-      timeoutMs: PREVIEW_START_TIMEOUT_MS,
-    });
+    await startProjectPreview(sandbox, nextProject, scripts);
 
     const upstreamPort = await waitForLocalPreview(sandbox, PREVIEW_PORTS);
     if (!upstreamPort) {
       logs = appendLog(logs, `Preview startup log:\n${await readPreviewLog(sandbox)}`);
       throw new AppError(
         "INTERNAL_ERROR",
-        "Preview did not start. Confirm the repository has a runnable npm dev script; its sandbox startup log was saved.",
+        "Preview did not start after its install and build completed; its sandbox startup log was saved.",
         { expose: true },
       );
     }
@@ -553,6 +612,26 @@ export async function applyPatchToExistingSandboxRun(
     const patchLog = await applyPatchToSandbox(sandbox, input.patch);
     logs = appendLog(logs, `Patch apply result:\n${patchLog}`);
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+
+    const scripts = await packageScripts(sandbox);
+    const nextProject = await isNextProject(sandbox);
+    validatePreviewScripts(nextProject, scripts);
+    if (nextProject) {
+      logs = appendLog(logs, "Rebuilding the production preview with the accepted change.");
+      await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+      const buildLog = await buildNextPreview(sandbox);
+      logs = appendLog(logs, buildLog);
+      await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+      await restartNextPreview(sandbox, scripts);
+      const upstreamPort = await waitForLocalPreview(sandbox, [3000]);
+      if (!upstreamPort) {
+        throw new AppError("INTERNAL_ERROR", "The preview did not restart after applying the accepted change.", {
+          expose: true,
+          cause: await readPreviewLog(sandbox),
+        });
+      }
+    }
+
     await transitionRevision(userId, input.revisionId, "READY");
     return getPrisma().sandboxRun.findUniqueOrThrow({ where: { id: input.sandboxRunId } });
   } catch (error) {

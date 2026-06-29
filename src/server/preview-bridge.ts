@@ -15,7 +15,7 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   const OVERLAY_ATTRIBUTE = "data-destoc-selection-overlay";
   const LABEL_ATTRIBUTE = "data-destoc-hover-label";
   const MARKER_LAYER_ATTRIBUTE = "data-destoc-marker-layer";
-  const MOTION_FALLBACK_ATTRIBUTE = "data-destoc-motion-fallback";
+  const PRELOADED_IMAGE_ATTRIBUTE = "data-destoc-preloaded";
   const MAX_TEXT_LENGTH = 1_000;
   let enabled = false;
   let highlightedElement = null;
@@ -314,80 +314,59 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
     renderMarkers();
   }
 
-  // Some motion libraries leave viewport-triggered *blurred entrance* content
-  // at opacity: 0 in an isolated preview, even after the page is otherwise
-  // idle. Limit the fallback to that exact pattern so ongoing transforms such
-  // as marquees, parallax, and other animation loops remain untouched.
-  function revealStalledMotion() {
-    const candidates = document.querySelectorAll("[style]");
-    for (const element of candidates) {
-      if (!(element instanceof HTMLElement)) continue;
-      if (element.closest("[aria-hidden=\\\"true\\\"]")) continue;
-      if (element.closest("dialog,[popover],[data-state=closed],[data-radix-popper-content-wrapper]")) continue;
-      const styles = window.getComputedStyle(element);
-      if (styles.opacity !== "0" || styles.visibility === "hidden") continue;
-      if (styles.filter === "none" && styles.transform === "none") continue;
+  function startNearViewportImagePreloading() {
+    if (typeof IntersectionObserver === "undefined") return;
 
-      const rect = element.getBoundingClientRect();
-      const isVisible = rect.width > 2 && rect.height > 2 && rect.bottom > -120 && rect.top < window.innerHeight + 120;
-      if (!isVisible) continue;
+    const imageObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting || !(entry.target instanceof HTMLImageElement)) continue;
+        const image = entry.target;
+        imageObserver.unobserve(image);
+        if (image.loading !== "lazy") continue;
+        image.loading = "eager";
+        image.setAttribute("loading", "eager");
+        image.setAttribute(PRELOADED_IMAGE_ATTRIBUTE, "true");
+      }
+    }, {
+      root: null,
+      rootMargin: "800px 0px",
+      threshold: 0,
+    });
 
-      element.setAttribute(MOTION_FALLBACK_ATTRIBUTE, "true");
-      element.style.setProperty("opacity", "1", "important");
-      element.style.setProperty("filter", "none", "important");
-    }
-  }
+    const observeImages = (root) => {
+      const scope = root && root.querySelectorAll ? root : document;
+      const images = Array.from(scope.querySelectorAll("img[loading=lazy]"));
+      if (root instanceof HTMLImageElement && root.loading === "lazy") images.unshift(root);
+      for (const image of images) {
+        if (!(image instanceof HTMLImageElement) || image.hasAttribute(PRELOADED_IMAGE_ATTRIBUTE)) continue;
+        imageObserver.observe(image);
+      }
+    };
 
-  function eagerlyLoadMedia(root) {
-    const scope = root && root.querySelectorAll ? root : document;
-    const media = Array.from(scope.querySelectorAll("img, iframe, video, source"));
-    if (root instanceof HTMLElement && root.matches("img, iframe, video, source")) media.unshift(root);
-    for (const element of media) {
-      if (!(element instanceof HTMLElement)) continue;
-      if (element instanceof HTMLImageElement || element instanceof HTMLIFrameElement) {
-        element.loading = "eager";
-        element.setAttribute("loading", "eager");
-      }
-      if (element instanceof HTMLImageElement) {
-        element.decoding = "async";
-        element.fetchPriority = "high";
-        if (element.dataset.src && !element.currentSrc) element.src = element.dataset.src;
-        if (element.dataset.srcset && !element.srcset) element.srcset = element.dataset.srcset;
-      }
-      if (element instanceof HTMLSourceElement && element.dataset.srcset && !element.srcset) {
-        element.srcset = element.dataset.srcset;
-      }
-      if (element instanceof HTMLVideoElement) {
-        element.preload = "auto";
-      }
-      element.setAttribute("data-destoc-eager-load", "true");
-    }
-  }
-
-  function observeLazyMedia() {
-    eagerlyLoadMedia(document);
+    observeImages(document);
     if (typeof MutationObserver === "undefined") return;
-    const observer = new MutationObserver((mutations) => {
+    const mutationObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLElement) eagerlyLoadMedia(node);
+          if (node instanceof HTMLElement) observeImages(node);
         }
       }
     });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    mutationObserver.observe(document.documentElement, { childList: true, subtree: true });
   }
 
-  let motionFallbackTimer = window.setTimeout(revealStalledMotion, 2200);
-  let eagerLoadTimer = window.setTimeout(() => {
-    eagerlyLoadMedia(document);
-    revealStalledMotion();
-  }, 700);
-  window.addEventListener("scroll", () => {
-    window.clearTimeout(motionFallbackTimer);
-    motionFallbackTimer = window.setTimeout(revealStalledMotion, 180);
-    window.clearTimeout(eagerLoadTimer);
-    eagerLoadTimer = window.setTimeout(() => eagerlyLoadMedia(document), 80);
-  }, { passive: true, capture: true });
+  function scheduleNearViewportImagePreloading() {
+    const start = () => {
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(startNearViewportImagePreloading, { timeout: 1_500 });
+        return;
+      }
+      window.setTimeout(startNearViewportImagePreloading, 250);
+    };
+
+    if (document.readyState === "complete") start();
+    else window.addEventListener("load", start, { once: true });
+  }
 
   window.addEventListener("message", (event) => {
     if (event.source !== window.parent || !event.data || event.data.source !== WORKSPACE_SOURCE) return;
@@ -424,11 +403,11 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       ensureOverlay();
-      observeLazyMedia();
+      scheduleNearViewportImagePreloading();
     }, { once: true });
   } else {
     ensureOverlay();
-    observeLazyMedia();
+    scheduleNearViewportImagePreloading();
   }
   post(READY_MESSAGE, { pageUrl: window.location.href });
 })();`;
