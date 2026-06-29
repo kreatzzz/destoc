@@ -72,7 +72,6 @@ All notable project decisions and changes are recorded here.
 - The sandbox motion fallback now preserves element transforms so continuous animations such as marquees keep running.
 - Fresh workspace chat sessions now center the composer with a minimal heading and animate it back into the bottom composer position once conversation state exists.
 - Workspace chat no longer renders an empty selected-component spacer when no components are attached.
-- Sign-in and sign-up now use a responsive workspace-entry layout with a server-rendered product preview, denser Destoc context, larger auth controls, and focused mobile forms while preserving email/password-only Better Auth behavior.
 
 ### Deferred
 

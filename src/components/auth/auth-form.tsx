@@ -1,16 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
 
-import { AnimatedArrowRightIcon } from "@/components/ui/animated-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
 
-export type AuthMode = "sign-in" | "sign-up";
+type AuthMode = "sign-in" | "sign-up";
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
   const router = useRouter();
@@ -40,78 +39,60 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   }
 
   return (
-    <form action={handleSubmit}>
-      <div className="grid gap-4">
-        {isSignUp ? (
+    <main className="grid min-h-dvh place-items-center bg-background p-6">
+      <form
+        action={handleSubmit}
+        className="w-full max-w-sm rounded-xl border bg-card p-6 shadow-2xl shadow-black/20"
+      >
+        <Link href="/" className="text-sm font-semibold tracking-tight">
+          Destoc
+        </Link>
+        <h1 className="mt-7 text-xl font-semibold tracking-tight">
+          {isSignUp ? "Create your workspace" : "Welcome back"}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {isSignUp
+            ? "Start with an email and password. You can import a public repository after sign-in."
+            : "Sign in to review the projects in your workspace."}
+        </p>
+
+        <div className="mt-6 grid gap-4">
+          {isSignUp ? (
+            <div className="grid gap-2">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" name="name" required autoComplete="name" maxLength={100} />
+            </div>
+          ) : null}
           <div className="grid gap-2">
-            <Label htmlFor="name" className="text-xs font-medium text-zinc-300">Name</Label>
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" name="email" type="email" required autoComplete="email" />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="password">Password</Label>
             <Input
-              id="name"
-              name="name"
+              id="password"
+              name="password"
+              type="password"
               required
-              autoComplete="name"
-              maxLength={100}
-              className="h-12 rounded-xl border-0 bg-black/25 px-4 text-sm text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.075)] transition-[background-color,box-shadow] duration-150 placeholder:text-zinc-600 focus-visible:bg-black/35 focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_1px_rgba(247,202,88,0.5),0_0_0_3px_rgba(247,202,88,0.08)]"
+              minLength={8}
+              maxLength={128}
+              autoComplete={isSignUp ? "new-password" : "current-password"}
             />
           </div>
-        ) : null}
-        <div className="grid gap-2">
-          <Label htmlFor="email" className="text-xs font-medium text-zinc-300">Email</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            className="h-12 rounded-xl border-0 bg-black/25 px-4 text-sm text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.075)] transition-[background-color,box-shadow] duration-150 placeholder:text-zinc-600 focus-visible:bg-black/35 focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_1px_rgba(247,202,88,0.5),0_0_0_3px_rgba(247,202,88,0.08)]"
-          />
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor="password" className="text-xs font-medium text-zinc-300">Password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            maxLength={128}
-            autoComplete={isSignUp ? "new-password" : "current-password"}
-            className="h-12 rounded-xl border-0 bg-black/25 px-4 text-sm text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.075)] transition-[background-color,box-shadow] duration-150 placeholder:text-zinc-600 focus-visible:bg-black/35 focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_1px_rgba(247,202,88,0.5),0_0_0_3px_rgba(247,202,88,0.08)]"
-          />
-        </div>
-      </div>
 
-      {error ? (
-        <p
-          role="alert"
-          aria-live="polite"
-          className="mt-4 rounded-xl bg-rose-400/10 px-3 py-2.5 text-xs leading-5 text-rose-200 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.16)]"
-        >
-          {error}
+        {error ? <p role="alert" className="mt-4 text-sm text-destructive">{error}</p> : null}
+
+        <Button className="mt-6 w-full" type="submit" disabled={isPending}>
+          {isPending ? "Please wait…" : isSignUp ? "Create account" : "Sign in"}
+        </Button>
+        <p className="mt-5 text-center text-sm text-muted-foreground">
+          {isSignUp ? "Already have an account?" : "Need an account?"}{" "}
+          <Link className="font-medium text-foreground underline underline-offset-4" href={isSignUp ? "/sign-in" : "/sign-up"}>
+            {isSignUp ? "Sign in" : "Create one"}
+          </Link>
         </p>
-      ) : null}
-
-      <Button
-        className="mt-6 h-12 w-full rounded-xl bg-[#f7ca58] px-4 font-semibold text-[#1f1605] shadow-[0_12px_28px_rgba(247,202,88,0.12)] transition-[background-color,box-shadow,scale] duration-150 hover:bg-[#ffd978] hover:shadow-[0_16px_34px_rgba(247,202,88,0.18)] active:scale-[0.96]"
-        type="submit"
-        disabled={isPending}
-      >
-        {isPending ? (
-          <>
-            <Loader2 className="size-4 animate-spin" />
-            Please wait…
-          </>
-        ) : (
-          <>
-            {isSignUp ? "Create account" : "Sign in"}
-            <AnimatedArrowRightIcon size={16} />
-          </>
-        )}
-      </Button>
-
-      <p className="mt-5 text-center text-xs leading-5 text-zinc-600">
-        Public repositories only. Preview execution stays isolated from application credentials.
-      </p>
-    </form>
+      </form>
+    </main>
   );
 }
