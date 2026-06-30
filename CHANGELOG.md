@@ -22,7 +22,7 @@ All notable project decisions and changes are recorded here.
 
 ### Changed
 
-- The landing page now uses stronger directional contrast, session-aware authentication actions, and a top-right `D.` mark while preserving the pixel-art visual direction.
+- The landing page now uses a lighter directional vignette, a Geist hero heading, session-aware authentication actions, and a combined top-left `D.`/Destoc wordmark while preserving the pixel-art visual direction.
 - Chat review completions now type out the provider’s user-facing summary, and accepted-change messages identify the applied change and sandbox rebuild instead of returning generic status copy.
 - The code-changes pane now has a centered workflow-oriented empty state with an animated file-edit icon.
 - The workspace manager now uses a compact Vercel-like shell with a thin navigation bar, dense repository rows, restrained radii, explicit dividers, and a focused import panel that adapts cleanly to narrow screens.
