@@ -33,7 +33,17 @@ type RevisionPayload = {
   projectId: string;
   sandboxRunId?: string | null;
   patch: string;
+  status: "QUEUED" | "APPLYING" | "READY" | "FAILED";
+  errorMessage?: string | null;
   sandboxRun?: SandboxRunPayload | null;
+};
+
+type ReviewPayload = {
+  id: string;
+  status: "DRAFT" | "RUNNING" | "READY" | "FAILED";
+  result?: { summary?: string } | null;
+  suggestions?: ReviewSuggestionPayload[];
+  errorMessage?: string | null;
 };
 
 const defaultData: WorkspaceData = {
@@ -259,6 +269,60 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     return false;
   }, [applyRunState, data.project.id, router]);
 
+  const pollRevision = useCallback(async (revisionId: string) => {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      const response = await fetch(`/api/revisions/${revisionId}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null) as {
+        revision?: RevisionPayload;
+        error?: { message?: string };
+      } | null;
+
+      if (!response.ok || !payload?.revision) {
+        if (attempt < 3) {
+          await wait(1_500);
+          continue;
+        }
+        throw new Error(payload?.error?.message ?? "Could not read the queued change status.");
+      }
+
+      if (payload.revision.status === "READY") return payload.revision;
+      if (payload.revision.status === "FAILED") {
+        throw new Error(payload.revision.errorMessage ?? "The queued code change could not be applied.");
+      }
+
+      await wait(1_500);
+    }
+
+    throw new Error("The code change is still queued. Refresh the project to continue watching it.");
+  }, []);
+
+  const pollReview = useCallback(async (reviewId: string) => {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      const response = await fetch(`/api/reviews/${reviewId}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null) as {
+        review?: ReviewPayload;
+        error?: { message?: string };
+      } | null;
+
+      if (!response.ok || !payload?.review) {
+        if (attempt < 3) {
+          await wait(1_500);
+          continue;
+        }
+        throw new Error(payload?.error?.message ?? "Could not read the queued review status.");
+      }
+
+      if (payload.review.status === "READY") return payload.review;
+      if (payload.review.status === "FAILED") {
+        throw new Error(payload.review.errorMessage ?? "The queued design review failed.");
+      }
+
+      await wait(1_500);
+    }
+
+    throw new Error("The design review is still queued. Refresh the project to continue watching it.");
+  }, []);
+
   const startPreview = useCallback(async () => {
     if (startingRef.current) return;
 
@@ -457,18 +521,21 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
         }),
       });
       const reviewPayload = await reviewResponse.json().catch(() => null) as {
-        review?: { result?: { summary?: string }; suggestions?: ReviewSuggestionPayload[] };
+        review?: ReviewPayload;
         error?: { message?: string };
       } | null;
       if (!reviewResponse.ok) throw new Error(reviewPayload?.error?.message ?? "Could not run the design review.");
+      if (!reviewPayload?.review?.id) throw new Error("The design review was queued without a review ID.");
 
-      const nextSuggestions = reviewPayload?.review?.suggestions?.map(mapReviewSuggestion) ?? [];
+      const completedReview = await pollReview(reviewPayload.review.id);
+
+      const nextSuggestions = completedReview.suggestions?.map(mapReviewSuggestion) ?? [];
       const nextSuggestionIds = nextSuggestions.filter((suggestion) => suggestion.patch?.trim()).map((suggestion) => suggestion.id);
       setSuggestions((current) => [
         ...current.filter((suggestion) => suggestion.status === "accepted"),
         ...nextSuggestions,
       ]);
-      const providerSummary = reviewPayload?.review?.result?.summary?.trim();
+      const providerSummary = completedReview.result?.summary?.trim();
       streamAssistantMessage(
         reviewCompletionMessage(providerSummary, nextSuggestions),
         nextSuggestionIds,
@@ -494,18 +561,23 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       const response = await fetch(`/api/suggestions/${suggestionId}/accept`, { method: "POST" });
       const payload = await response.json().catch(() => null) as { revision?: RevisionPayload; error?: { message?: string } } | null;
       if (!response.ok) throw new Error(payload?.error?.message ?? "Could not accept this patch.");
+      if (!payload?.revision?.id) throw new Error("The change was accepted but no background job was returned.");
 
+      const completedRevision = await pollRevision(payload.revision.id);
       setSuggestions((current) => current.map((suggestion) => (
         suggestion.id === suggestionId ? { ...suggestion, status: "accepted" } : suggestion
       )));
-      if (payload?.revision?.sandboxRun) {
-        applyRunState(payload.revision.sandboxRun);
+      if (completedRevision.sandboxRun) {
+        applyRunState(completedRevision.sandboxRun);
         window.setTimeout(() => setPreviewReloadKey((key) => key + 1), 450);
         streamAssistantMessage(`Applied${changeLabel}. I rebuilt the sandbox preview and refreshed it with the completed change.`);
       }
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not accept this patch.";
+      setSuggestions((current) => current.map((suggestion) => (
+        suggestion.id === suggestionId ? { ...suggestion, status: "failed" } : suggestion
+      )));
       setAuditError(message);
       streamAssistantMessage(message);
     } finally {

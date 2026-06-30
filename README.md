@@ -6,6 +6,7 @@ Destoc is a desktop-first design-review workspace for public GitHub repositories
 
 - Next.js App Router, React 19, TypeScript, Tailwind CSS, shadcn/ui, Bun
 - PostgreSQL, Prisma 7 with the PostgreSQL adapter, Better Auth
+- Redis and BullMQ for durable sandbox, review, and revision jobs
 - Vercel Sandbox for isolated repository execution; Vercel Blob for future screenshot persistence
 - Upstash Redis for distributed rate limiting in production
 
@@ -17,6 +18,12 @@ bun install
 bun run db:migrate --name init
 bun run db:seed
 bun run dev
+```
+
+Run the background worker in a second terminal:
+
+```bash
+bun run worker
 ```
 
 The seeded account defaults to `demo@destoc.local` / `DemoPassword123!`. Change both values outside local development.
@@ -35,7 +42,7 @@ bunx prisma validate
 
 ## Deployment
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the Coolify/Docker runbook. The app ships with a Dockerfile, standalone Next.js output, runtime Prisma migrations, and `/api/health` for container health checks.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the two-service Coolify/Oracle runbook. The app ships with a Dockerfile, standalone Next.js output, a BullMQ worker role, runtime Prisma migrations, and `/api/health` for web-container health checks.
 
 ## Security and execution model
 

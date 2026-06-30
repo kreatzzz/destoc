@@ -53,7 +53,7 @@ export async function createReviewTarget(userId: string, input: CreateReviewTarg
   });
 }
 
-export async function runReview(userId: string, input: CreateReviewInput | unknown) {
+export async function createReview(userId: string, input: CreateReviewInput | unknown) {
   await enforceRateLimit("review", userId);
   const parsed = createReviewSchema.parse(input);
   await requireProjectOwnership(parsed.projectId, userId);
@@ -72,26 +72,75 @@ export async function runReview(userId: string, input: CreateReviewInput | unkno
   }
 
   const provider = getDesignReviewProvider();
-  const review = await getPrisma().review.create({
+  return getPrisma().review.create({
     data: {
       projectId: parsed.projectId,
       reviewTargetId: target.id,
       scope: parsed.scope,
-      status: "RUNNING",
+      status: "DRAFT",
       provider: provider.id,
       prompt: parsed.prompt,
     },
   });
+}
+
+export async function recoverInterruptedReview(userId: string, reviewId: string) {
+  const review = await getPrisma().review.findFirst({
+    where: { id: reviewId, project: { workspace: { userId } } },
+    select: { status: true },
+  });
+  if (!review) throw new AppError("NOT_FOUND", "Review not found.");
+  if (review.status === "DRAFT") return true;
+  if (review.status !== "RUNNING") return false;
+
+  const recovered = await getPrisma().review.updateMany({
+    where: { id: reviewId, status: "RUNNING" },
+    data: {
+      status: "DRAFT",
+      errorCode: null,
+      errorMessage: null,
+    },
+  });
+  return recovered.count > 0;
+}
+
+export async function executeReview(userId: string, reviewId: string) {
+  const review = await getPrisma().review.findFirst({
+    where: { id: reviewId, project: { workspace: { userId } } },
+    include: {
+      reviewTarget: { include: { element: true, project: true } },
+    },
+  });
+  if (!review) throw new AppError("NOT_FOUND", "Review not found.");
+  if (review.status === "READY") return getReview(userId, review.id);
+  if (review.status !== "DRAFT") {
+    throw new AppError("CONFLICT", "Review is not ready for background execution.");
+  }
+
+  const claimed = await getPrisma().review.updateMany({
+    where: { id: review.id, status: "DRAFT" },
+    data: {
+      status: "RUNNING",
+      errorCode: null,
+      errorMessage: null,
+    },
+  });
+  if (claimed.count === 0) {
+    throw new AppError("CONFLICT", "Review was already claimed by another worker.");
+  }
+
+  const target = review.reviewTarget;
+  const provider = getDesignReviewProvider();
 
   try {
-    const sourceContext = await sourceContextForReview(target.project, target, parsed.prompt).catch(() => ({
+    const sourceContext = await sourceContextForReview(target.project, target, review.prompt ?? undefined).catch(() => ({
       candidates: [],
       note: "Source context lookup failed; provider received DOM evidence only.",
     }));
 
     const result = await provider.review({
-      scope: parsed.scope,
-      prompt: parsed.prompt,
+      scope: review.scope,
+      prompt: review.prompt ?? undefined,
       evidence: {
         pageUrl: target.pageUrl,
         repository: {

@@ -1,10 +1,11 @@
-FROM oven/bun:1.2-slim AS base
+FROM node:22-bookworm-slim AS base
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl openssl \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl openssl \
+  && npm install --global bun@1.3.14 \
   && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
@@ -15,15 +16,11 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ARG DATABASE_URL="postgresql://postgres:postgres@localhost:5432/destoc"
-ARG BETTER_AUTH_SECRET="build-time-placeholder-secret-at-least-32-chars"
-ARG BETTER_AUTH_URL="http://localhost:3000"
-
-ENV DATABASE_URL=$DATABASE_URL
-ENV BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
-ENV BETTER_AUTH_URL=$BETTER_AUTH_URL
-
-RUN bun run build
+RUN export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/destoc" \
+  BETTER_AUTH_SECRET="build-time-placeholder-secret-at-least-32-chars" \
+  BETTER_AUTH_URL="http://localhost:3000" \
+  && bun run prebuild \
+  && node node_modules/next/dist/bin/next build
 
 FROM base AS runner
 WORKDIR /app
@@ -32,11 +29,17 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
+ENV CODEX_HOME=/data/codex
+ENV PATH="/root/.bun/bin:${PATH}"
+
+ARG CODEX_VERSION=0.133.0
+RUN bun add --global "@openai/codex@${CODEX_VERSION}" \
+  && mkdir -p /data/codex
 
 COPY --from=builder /app ./
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD curl -fsS "http://127.0.0.1:${PORT}/api/health" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD if [ "${PROCESS_ROLE:-web}" = "worker" ]; then exit 0; else curl -fsS "http://127.0.0.1:${PORT}/api/health" || exit 1; fi
 
-CMD ["sh", "-c", "bun run db:deploy && bun run start"]
+CMD ["bash", "scripts/start-production.sh"]

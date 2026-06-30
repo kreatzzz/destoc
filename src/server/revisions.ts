@@ -155,3 +155,27 @@ export async function getRevision(userId: string, revisionId: string) {
   if (!revision) throw new AppError("NOT_FOUND", "Revision not found.");
   return revision;
 }
+
+/**
+ * Reset only an interrupted application. Terminal revisions are not replayed;
+ * an APPLYING revision can be safely retried because patch application checks
+ * for both clean application and an already-applied patch.
+ */
+export async function recoverInterruptedRevision(userId: string, revisionId: string) {
+  const revision = await getPrisma().revision.findFirst({
+    where: { id: revisionId, project: { workspace: { userId } } },
+  });
+  if (!revision) throw new AppError("NOT_FOUND", "Revision not found.");
+  if (revision.status === "QUEUED") return true;
+  if (revision.status !== "APPLYING") return false;
+
+  const recovered = await getPrisma().revision.updateMany({
+    where: { id: revision.id, status: "APPLYING" },
+    data: {
+      status: "QUEUED",
+      errorCode: null,
+      errorMessage: null,
+    },
+  });
+  return recovered.count === 1;
+}

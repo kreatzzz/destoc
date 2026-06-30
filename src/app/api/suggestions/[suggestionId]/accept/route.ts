@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/auth";
-import { withRouteErrorHandling } from "@/lib/errors";
-import { acceptSuggestion } from "@/server/revisions";
-import { applyPatchToExistingSandboxRun } from "@/server/sandbox-executor";
+import { AppError, withRouteErrorHandling } from "@/lib/errors";
+import { enqueueRevisionApplication } from "@/server/job-queue";
+import { acceptSuggestion, transitionRevision } from "@/server/revisions";
 
 export const runtime = "nodejs";
 
@@ -13,17 +13,33 @@ export async function POST(_request: Request, { params }: RouteContext) {
     const user = await requireCurrentUser();
     const { suggestionId } = await params;
     const revision = await acceptSuggestion(user.id, suggestionId);
+    if (!revision.sandboxRunId) {
+      throw new AppError(
+        "CONFLICT",
+        "This suggestion is not attached to an active sandbox run.",
+      );
+    }
 
-    if (revision.sandboxRunId) {
-      const sandboxRun = await applyPatchToExistingSandboxRun(user.id, {
+    try {
+      await enqueueRevisionApplication({
+        userId: user.id,
         sandboxRunId: revision.sandboxRunId,
         projectId: revision.projectId,
         patch: revision.patch,
         revisionId: revision.id,
       });
-      return NextResponse.json({ revision: { ...revision, sandboxRun } }, { status: 201 });
+    } catch (error) {
+      await transitionRevision(user.id, revision.id, "FAILED", {
+        errorCode: "QUEUE_UNAVAILABLE",
+        errorMessage: "The background worker queue is unavailable. Try accepting the change again shortly.",
+      });
+      throw new AppError(
+        "CONFIGURATION_ERROR",
+        "The background worker queue is unavailable. Try accepting the change again shortly.",
+        { cause: error },
+      );
     }
 
-    return NextResponse.json({ revision }, { status: 201 });
+    return NextResponse.json({ revision }, { status: 202 });
   });
 }

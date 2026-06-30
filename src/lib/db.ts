@@ -12,9 +12,9 @@ export function getPrisma(): PrismaClient {
   const adapter = new PrismaPg(getServerEnv().DATABASE_URL);
   const prisma = new PrismaClient({ adapter });
 
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = prisma;
-  }
+  // Both the web server and the BullMQ worker are long-lived processes.
+  // Reuse one client per process so repeated jobs do not leak connection pools.
+  globalForPrisma.prisma = prisma;
 
   return prisma;
 }

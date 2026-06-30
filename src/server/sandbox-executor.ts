@@ -582,6 +582,52 @@ export async function executeSandboxRun(
   }
 }
 
+/**
+ * BullMQ is at-least-once. If a worker dies after moving a run into an active
+ * state, stop the deterministic remote sandbox and return the database record
+ * to QUEUED before BullMQ replays the stalled job.
+ */
+export async function recoverInterruptedSandboxExecution(
+  userId: string,
+  sandboxRunId: string,
+): Promise<boolean> {
+  const run = await getPrisma().sandboxRun.findFirst({
+    where: { id: sandboxRunId, project: { workspace: { userId } } },
+  });
+  if (!run) throw new AppError("NOT_FOUND", "Sandbox run not found.");
+  if (run.status === "QUEUED") return true;
+  if (run.status !== "PROVISIONING" && run.status !== "BUILDING") return false;
+
+  try {
+    const sandbox = await Sandbox.get({
+      ...getSandboxCredentials(),
+      name: `destoc-${run.id}`,
+      resume: false,
+    });
+    await sandbox.stop();
+  } catch (error) {
+    console.warn("Could not stop interrupted sandbox before job recovery", error);
+  }
+
+  const recovered = await getPrisma().sandboxRun.updateMany({
+    where: {
+      id: run.id,
+      status: { in: ["PROVISIONING", "BUILDING"] },
+    },
+    data: {
+      status: "QUEUED",
+      previewUrl: null,
+      errorCode: null,
+      errorMessage: null,
+      startedAt: null,
+      stoppedAt: null,
+      logs: appendLog(run.logs ?? "", "Recovering interrupted worker job."),
+    },
+  });
+
+  return recovered.count === 1;
+}
+
 export async function applyPatchToExistingSandboxRun(
   userId: string,
   input: { projectId: string; sandboxRunId: string; revisionId: string; patch: string },

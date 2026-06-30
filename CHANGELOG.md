@@ -6,6 +6,8 @@ All notable project decisions and changes are recorded here.
 
 ### Added
 
+- A Redis-backed BullMQ worker for sandbox execution, AI review generation, and accepted revision application, with persisted polling state and stalled-job recovery.
+- A two-service Coolify/Oracle deployment model, a production process-role launcher, and a persistent Codex CLI authentication path for the worker.
 - A reusable evidence-bound design-review system prompt that encodes implementation-first interface rules, accessibility constraints, safe patch behavior, and honest user-facing summaries.
 - A second curated Codex transcript covering sandbox hydration, workspace-manager, landing-page, and chatbot refinements.
 - Project operating guidance in `AGENTS.md`.
