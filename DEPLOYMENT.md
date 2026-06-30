@@ -71,7 +71,7 @@ VERCEL_PROJECT_ID=...
 DESIGN_REVIEW_PROVIDER=command
 ALLOW_COMMAND_REVIEW_PROVIDER=true
 COMMAND_AI_BIN=codex
-COMMAND_AI_ARGS=["exec","--model","gpt-5.4","-c","model_reasoning_effort=\"medium\"","--sandbox","read-only","--color","never","--ephemeral","-"]
+COMMAND_AI_ARGS=["exec","--skip-git-repo-check","--model","gpt-5.4","-c","model_reasoning_effort=\"medium\"","--sandbox","read-only","--color","never","--ephemeral","-"]
 COMMAND_AI_TIMEOUT_MS=300000
 ```
 

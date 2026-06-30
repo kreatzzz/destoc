@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { countWords, REVIEW_PROMPT_WORD_LIMIT } from "@/lib/prompt-limits";
 
 const githubRepositoryPath = /^\/([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/;
 
@@ -97,7 +98,15 @@ export const createReviewSchema = z.object({
   projectId: z.string().cuid(),
   reviewTargetId: z.string().cuid(),
   scope: reviewScopeSchema,
-  prompt: z.string().trim().max(4_000).optional(),
+  prompt: z
+    .string()
+    .trim()
+    .max(4_000)
+    .refine(
+      (value) => countWords(value) <= REVIEW_PROMPT_WORD_LIMIT,
+      `Review prompts are limited to ${REVIEW_PROMPT_WORD_LIMIT} words.`,
+    )
+    .optional(),
 });
 
 export const rejectSuggestionSchema = z.object({

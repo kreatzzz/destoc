@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { z } from "zod";
 import { DESTOC_DESIGN_REVIEW_SYSTEM_PROMPT } from "@/lib/design-review-system-prompt";
 import { AppError } from "@/lib/errors";
@@ -61,6 +61,12 @@ const implementationGuidance = [
   "If the exact text is not present, still inspect nearby candidate files and patch the most likely UI source when the requested change is low-risk.",
   "Only omit suggestion.patch when there is genuinely no safe source candidate.",
 ].join(" ");
+
+export function withCodexExecSafetyArgs(command: string, args: string[]) {
+  const isCodexExec = basename(command) === "codex" && args[0] === "exec";
+  if (!isCodexExec || args.includes("--skip-git-repo-check")) return [...args];
+  return [args[0], "--skip-git-repo-check", ...args.slice(1)];
+}
 
 function providerRequestPayload(request: DesignReviewRequest) {
   return {
@@ -225,15 +231,15 @@ class CommandReviewProvider implements DesignReviewProvider {
   }
 
   private commandInvocation() {
-    const isCodexExec = this.command === "codex" && this.args[0] === "exec";
-    const alreadyCapturesLastMessage = this.args.includes("--output-last-message") || this.args.includes("-o");
+    const args = withCodexExecSafetyArgs(this.command, this.args);
+    const isCodexExec = basename(this.command) === "codex" && args[0] === "exec";
+    const alreadyCapturesLastMessage = args.includes("--output-last-message") || args.includes("-o");
 
     if (!isCodexExec || alreadyCapturesLastMessage) {
-      return { args: this.args, outputPath: undefined };
+      return { args, outputPath: undefined };
     }
 
     const outputPath = join(tmpdir(), `destoc-command-review-${randomUUID()}.txt`);
-    const args = [...this.args];
     const insertionIndex = args.at(-1) === "-" ? args.length - 1 : args.length;
     args.splice(insertionIndex, 0, "--output-last-message", outputPath);
     return { args, outputPath };

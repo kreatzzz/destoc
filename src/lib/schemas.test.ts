@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createProjectSchema, githubRepositoryUrlSchema, selectedElementSchema } from "@/lib/schemas";
+import {
+  createProjectSchema,
+  createReviewSchema,
+  githubRepositoryUrlSchema,
+  selectedElementSchema,
+} from "@/lib/schemas";
 
 describe("githubRepositoryUrlSchema", () => {
   it("normalizes a public GitHub repository URL", () => {
@@ -21,6 +26,21 @@ describe("githubRepositoryUrlSchema", () => {
     expect(() => githubRepositoryUrlSchema.parse("https://github.com/acme/design-system/issues")).toThrow(
       "Use a repository URL",
     );
+  });
+});
+
+describe("createReviewSchema", () => {
+  const baseReview = {
+    projectId: "cmqqpfhv00001x5sgwh9ssvm1",
+    reviewTargetId: "cmqqpfhv00001x5sgwh9ssvm2",
+    scope: "PAGE",
+  };
+
+  it("rejects review prompts over 100 words", () => {
+    expect(() => createReviewSchema.parse({
+      ...baseReview,
+      prompt: Array.from({ length: 101 }, () => "word").join(" "),
+    })).toThrow("Review prompts are limited to 100 words.");
   });
 });
 

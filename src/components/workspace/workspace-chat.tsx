@@ -1,7 +1,7 @@
 "use client";
 
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { Loader2 } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 
 import { AnimatedArrowUpIcon, AnimatedXIcon } from "@/components/ui/animated-icons";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -21,6 +21,11 @@ import {
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  countWords,
+  limitWords,
+  REVIEW_PROMPT_WORD_LIMIT,
+} from "@/lib/prompt-limits";
 import { cn } from "@/lib/utils";
 import type { WorkspaceChatMessage, WorkspaceSelectedElement, WorkspaceSuggestion } from "./types";
 
@@ -79,7 +84,16 @@ export function WorkspaceChat({
   onSelectionNoteChange,
 }: WorkspaceChatProps) {
   const hasSelectedElementNotes = selectedElements.some((element) => Boolean(element.note?.trim()));
-  const canSend = (prompt.trim().length > 0 || hasSelectedElementNotes) && !isAuditPending;
+  const promptWordCount = countWords(prompt);
+  const selectedNoteWordCount = selectedElements.reduce(
+    (total, element) => total + countWords(element.note ?? ""),
+    0,
+  );
+  const totalWordCount = promptWordCount + selectedNoteWordCount;
+  const availablePromptWords = Math.max(0, REVIEW_PROMPT_WORD_LIMIT - selectedNoteWordCount);
+  const canSend = (prompt.trim().length > 0 || hasSelectedElementNotes)
+    && totalWordCount <= REVIEW_PROMPT_WORD_LIMIT
+    && !isAuditPending;
   const visibleSelections = selectedElements.slice(-visibleSelectionLimit);
   const hiddenSelectionCount = Math.max(0, selectedElements.length - visibleSelections.length);
   const activeSelection = selectedElements.find((element) => element.id === activeSelectionId)
@@ -321,7 +335,7 @@ export function WorkspaceChat({
         <div className="rounded-2xl bg-[#171715] p-2 shadow-[0_18px_50px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(255,255,255,0.075)]">
           <Textarea
             value={prompt}
-            onChange={(event) => onPromptChange(event.target.value)}
+            onChange={(event) => onPromptChange(limitWords(event.target.value, availablePromptWords))}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
@@ -332,7 +346,32 @@ export function WorkspaceChat({
             className="max-h-36 min-h-16 resize-none rounded-xl border-0 bg-transparent px-2.5 py-1.5 text-sm leading-6 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
           />
           <div className="flex items-center justify-between px-1 pt-1">
-            <span aria-hidden="true" />
+            <div className="flex items-center gap-0.5 text-zinc-600">
+              <span
+                aria-live="polite"
+                className={cn(
+                  "text-[11px] font-medium tabular-nums transition-colors duration-150",
+                  totalWordCount >= 90 ? "text-[#f7ca58]" : "text-zinc-600",
+                  totalWordCount > REVIEW_PROMPT_WORD_LIMIT ? "text-rose-300" : "",
+                )}
+              >
+                {totalWordCount}/{REVIEW_PROMPT_WORD_LIMIT}
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Why prompts are limited"
+                    className="inline-flex size-10 items-center justify-center rounded-full text-zinc-600 transition-[color,background-color,scale] duration-150 hover:bg-white/[0.04] hover:text-zinc-300 active:scale-[0.96]"
+                  >
+                    <Info className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6}>
+                  Prompts and selected component notes are limited to 100 words to help control review costs.
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button size="icon-sm" aria-label="Send prompt" disabled={!canSend} onClick={onSendPrompt} className="bg-[#f7ca58] text-[#1b1205] hover:bg-[#ffd879]">
