@@ -32,6 +32,9 @@ replaced in the same unreleased development cycle.
 
 ### Changed
 
+- The production image now copies only Next.js standalone output, static
+  assets, worker source, migrations, and production dependencies instead of
+  duplicating the full builder tree and build cache into the runtime layer.
 - Transcript artifacts now identify Codex as the only AI coding assistant and
   distinguish Agentation page feedback from AI-tool usage; no Cursor or
   OpenCode usage is claimed.

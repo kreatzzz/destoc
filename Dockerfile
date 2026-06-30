@@ -12,6 +12,10 @@ FROM base AS deps
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
+FROM base AS production-deps
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -36,12 +40,20 @@ ARG CODEX_VERSION=0.133.0
 RUN bun add --global "@openai/codex@${CODEX_VERSION}" \
   && mkdir -p /data/codex
 
-COPY --from=builder /app ./
+COPY --from=production-deps /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/.next/standalone ./.next/standalone
 COPY --from=builder /app/.next/static ./.next/standalone/.next/static
 COPY --from=builder /app/public ./.next/standalone/public
 
 RUN test -d .next/standalone/.next/static \
-  && test -f .next/standalone/public/destoc-hero-bg.png
+  && test -f .next/standalone/public/destoc-hero-bg.png \
+  && test -x node_modules/.bin/prisma
 
 EXPOSE 3000
 
