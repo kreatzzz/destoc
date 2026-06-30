@@ -27,6 +27,7 @@ All notable project decisions and changes are recorded here.
 ### Changed
 
 - Production Codex invocations now bypass the Git repository trust check for the isolated worker application directory, and workspace prompts expose a cost-oriented 100-word limit with a live counter.
+- The workspace composer footer is denser, with a compact cost-info control positioned directly beside the word counter.
 - Fixed production standalone packaging so Next.js CSS, JavaScript chunks, public images, and image optimization assets are served from the deployed container.
 - Repository rows now include an icon-only delete action with a shadcn confirmation dialog, pending state, inline failure feedback, and automatic list refresh.
 - The landing page now uses a lighter directional vignette, a Geist hero heading, session-aware authentication actions, and a combined top-left `D.`/Destoc wordmark while preserving the pixel-art visual direction.

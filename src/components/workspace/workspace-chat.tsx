@@ -332,7 +332,7 @@ export function WorkspaceChat({
             />
           </div>
         ) : null}
-        <div className="rounded-2xl bg-[#171715] p-2 shadow-[0_18px_50px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(255,255,255,0.075)]">
+        <div className="rounded-2xl bg-[#171715] p-1.5 shadow-[0_18px_50px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(255,255,255,0.075)]">
           <Textarea
             value={prompt}
             onChange={(event) => onPromptChange(limitWords(event.target.value, availablePromptWords))}
@@ -345,8 +345,8 @@ export function WorkspaceChat({
             placeholder={hasSelectedElementNotes ? "Optional: add extra direction for these notes…" : "Ask for a design audit or targeted improvement…"}
             className="max-h-36 min-h-16 resize-none rounded-xl border-0 bg-transparent px-2.5 py-1.5 text-sm leading-6 text-zinc-100 shadow-none placeholder:text-zinc-600 focus-visible:ring-0"
           />
-          <div className="flex items-center justify-between px-1 pt-1">
-            <div className="flex items-center gap-0.5 text-zinc-600">
+          <div className="flex h-8 items-center justify-between px-1">
+            <div className="flex items-center gap-0 text-zinc-600">
               <span
                 aria-live="polite"
                 className={cn(
@@ -362,12 +362,12 @@ export function WorkspaceChat({
                   <button
                     type="button"
                     aria-label="Why prompts are limited"
-                    className="inline-flex size-10 items-center justify-center rounded-full text-zinc-600 transition-[color,background-color,scale] duration-150 hover:bg-white/[0.04] hover:text-zinc-300 active:scale-[0.96]"
+                    className="ml-0.5 inline-flex size-5 items-center justify-center rounded-md text-zinc-600 transition-[color,scale] duration-150 hover:text-zinc-300 active:scale-[0.96]"
                   >
-                    <Info className="size-3.5" />
+                    <Info className="size-3" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={6}>
+                <TooltipContent side="top" sideOffset={4}>
                   Prompts and selected component notes are limited to 100 words to help control review costs.
                 </TooltipContent>
               </Tooltip>
