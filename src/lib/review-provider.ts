@@ -4,6 +4,7 @@ import { readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
+import { DESTOC_DESIGN_REVIEW_SYSTEM_PROMPT } from "@/lib/design-review-system-prompt";
 import { AppError } from "@/lib/errors";
 import { getServerEnv } from "@/lib/env";
 import type { DesignReviewEvidence } from "@/lib/types";
@@ -82,8 +83,8 @@ export const mockDesignReviewProvider: DesignReviewProvider = {
 
     const result: DesignReviewResult = {
       summary: elementLabel
-        ? `Review of ${elementLabel} on ${evidence.pageUrl}.`
-        : `Page audit of ${evidence.pageUrl}.`,
+        ? `I inspected the selected ${elementLabel} and prepared a hierarchy-focused improvement from the supplied interface evidence.`
+        : "I inspected the page evidence and prepared a hierarchy-focused interface improvement.",
       suggestions: [
         {
           severity: "medium",
@@ -153,10 +154,9 @@ class LocalOpenAICompatibleProvider implements DesignReviewProvider {
           {
             role: "system",
             content: [
-              "You are Destoc's design-review provider.",
+              DESTOC_DESIGN_REVIEW_SYSTEM_PROMPT,
               "Return only JSON matching this shape:",
               reviewJsonShape,
-              "Keep suggestions practical, visual, and based only on the supplied evidence.",
               implementationGuidance,
               "Do not include markdown fences.",
             ].join(" "),
@@ -202,11 +202,10 @@ class CommandReviewProvider implements DesignReviewProvider {
 
   private buildPrompt(request: DesignReviewRequest) {
     return [
-      "You are Destoc's design-review provider.",
+      DESTOC_DESIGN_REVIEW_SYSTEM_PROMPT,
       "Return only valid JSON. Do not include markdown fences or commentary.",
       "The JSON must match this shape:",
       reviewJsonShape,
-      "Keep suggestions practical, visual, and based only on the supplied evidence.",
       implementationGuidance,
       "",
       "Request:",

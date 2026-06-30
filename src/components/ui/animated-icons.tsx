@@ -8,6 +8,7 @@ import {
   CursorClickIcon,
   DeleteIcon,
   EyeIcon,
+  FilePenLineIcon,
   FolderOpenIcon,
   LogoutIcon,
   PanelLeftCloseIcon,
@@ -61,6 +62,10 @@ export const AnimatedEyeIcon = forwardRef<EyeIconHandle, AnimatedIconProps>(
 
 export function AnimatedFolderOpenIcon({ className, size = 16, ...props }: AnimatedIconProps) {
   return <FolderOpenIcon size={size} className={iconClassName(className)} {...props} />;
+}
+
+export function AnimatedFilePenLineIcon({ className, size = 16, ...props }: AnimatedIconProps) {
+  return <FilePenLineIcon size={size} className={iconClassName(className)} {...props} />;
 }
 
 export function AnimatedLogoutIcon({ className, size = 16, ...props }: AnimatedIconProps) {

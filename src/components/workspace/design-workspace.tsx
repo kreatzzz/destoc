@@ -123,6 +123,24 @@ function buildReviewPrompt(prompt: string, selectedElementNotes: string[]) {
   ].filter(Boolean).join("\n\n");
 }
 
+function reviewCompletionMessage(summary: string | undefined, suggestions: WorkspaceSuggestion[]) {
+  const draftedSuggestions = suggestions.filter((suggestion) => suggestion.patch?.trim());
+  const providerSummary = summary?.trim();
+
+  if (!draftedSuggestions.length) {
+    return [
+      providerSummary,
+      "I did not prepare a code diff because the available source evidence was not sufficient for a safe change. Select a more specific component or add a direct note.",
+    ].filter(Boolean).join("\n\n");
+  }
+
+  const draftedChangeCopy = draftedSuggestions.length === 1
+    ? `I prepared “${draftedSuggestions[0]?.title}”. The code is drafted and has not been applied yet.`
+    : `I prepared ${draftedSuggestions.length} code changes: ${draftedSuggestions.map((suggestion) => `“${suggestion.title}”`).join(", ")}. They have not been applied yet.`;
+
+  return [providerSummary, draftedChangeCopy].filter(Boolean).join("\n\n");
+}
+
 function mapReviewSuggestion(suggestion: ReviewSuggestionPayload): WorkspaceSuggestion {
   return {
     id: suggestion.id,
@@ -180,10 +198,10 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
     if (run.previewUrl && run.status === "READY") setPreviewUrl(run.previewUrl);
   }, []);
 
-  const streamAssistantMessage = useCallback((content: string) => {
+  const streamAssistantMessage = useCallback((content: string, suggestionIds?: string[]) => {
     const id = crypto.randomUUID();
     let index = 0;
-    setMessages((current) => [...current, { id, role: "assistant", content: "" }]);
+    setMessages((current) => [...current, { id, role: "assistant", content: "", suggestionIds }]);
 
     const interval = setInterval(() => {
       index = Math.min(content.length, index + 3);
@@ -450,15 +468,11 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
         ...current.filter((suggestion) => suggestion.status === "accepted"),
         ...nextSuggestions,
       ]);
-      const hasPatch = nextSuggestions.some((suggestion) => suggestion.patch?.trim());
-      setMessages((current) => [...current, {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        suggestionIds: nextSuggestionIds,
-        content: hasPatch
-          ? "I drafted a code change. Review the card below; the diff is in the code pane."
-          : "I could not draft a safe diff yet. Try selecting a more specific component or adding a more direct note.",
-      }]);
+      const providerSummary = reviewPayload?.review?.result?.summary?.trim();
+      streamAssistantMessage(
+        reviewCompletionMessage(providerSummary, nextSuggestions),
+        nextSuggestionIds,
+      );
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not complete the review.";
@@ -470,9 +484,11 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
   }
 
   async function acceptSuggestion(suggestionId: string) {
+    const acceptedSuggestion = suggestions.find((suggestion) => suggestion.id === suggestionId);
+    const changeLabel = acceptedSuggestion?.title ? ` “${acceptedSuggestion.title}”` : "";
     setPendingSuggestionId(suggestionId);
     setAuditError(null);
-    streamAssistantMessage("Accepted. Applying the patch to the live sandbox…");
+    streamAssistantMessage(`Applying${changeLabel} to the live sandbox…`);
 
     try {
       const response = await fetch(`/api/suggestions/${suggestionId}/accept`, { method: "POST" });
@@ -485,7 +501,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       if (payload?.revision?.sandboxRun) {
         applyRunState(payload.revision.sandboxRun);
         window.setTimeout(() => setPreviewReloadKey((key) => key + 1), 450);
-        streamAssistantMessage("Patch applied. The preview has been refreshed with the completed change.");
+        streamAssistantMessage(`Applied${changeLabel}. I rebuilt the sandbox preview and refreshed it with the completed change.`);
       }
       router.refresh();
     } catch (error) {

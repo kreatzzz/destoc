@@ -15,6 +15,7 @@
 - Vercel Sandbox preview lifecycle, isolated repository execution, restart/stop controls, and preview bridge behavior.
 - Component selection, component notes, chat prompt context, suggestion generation, accept/reject decisions, and live sandbox patch application.
 - Workspace UI iteration, including the repository dashboard, design workspace, chat rail, diff pane, and toolbar interactions.
+- Landing-page visibility, session-aware authentication links, system-prompt design, and user-facing streamed review summaries.
 - Error handling, rate limiting, environment documentation, Docker/Coolify deployment support, and validation commands.
 
 ## Important manual decisions
@@ -31,7 +32,7 @@
 
 - The deterministic mock provider is the safest default while live provider wiring is still being finalized.
 - The DeepSeek provider is intended for production but is not fully connected yet.
-- Public repository previews currently expect a root `package.json` with an editable `dev` script.
+- Public Next.js previews currently expect a root `package.json` with runnable `build` and `start` scripts; other supported web repositories need `dev` or `start`.
 - Accepted patches apply to the currently running sandbox only; new sessions intentionally start from clean repository source.
 - Code patching is best-effort and limited to safe UI/source paths.
 - The command provider is local and experimental; it should not be treated as hosted production AI infrastructure.

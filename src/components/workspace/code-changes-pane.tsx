@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
+import { AnimatedFilePenLineIcon } from "@/components/ui/animated-icons";
 import { Button } from "@/components/ui/button";
 import type { WorkspaceSuggestion } from "./types";
 
@@ -80,8 +81,16 @@ export function CodeChangesPane({
             </article>
           );
         }) : (
-          <div className="rounded-2xl bg-white/[0.035] p-4 text-sm leading-6 text-zinc-500">
-            No code diff yet. Select a component and ask Destoc to change it.
+          <div className="flex min-h-60 items-center justify-center rounded-2xl bg-white/[0.025] px-6 text-center shadow-[inset_0_0_0_1px_rgba(255,255,255,0.055)]">
+            <div className="max-w-52">
+              <span className="mx-auto grid size-10 place-items-center rounded-xl bg-[#f7ca58]/10 text-[#f7ca58] shadow-[inset_0_0_0_1px_rgba(247,202,88,0.12)]">
+                <AnimatedFilePenLineIcon size={18} />
+              </span>
+              <p className="mt-3 text-sm font-medium text-zinc-200">No code changes yet</p>
+              <p className="mt-1 text-pretty text-xs leading-5 text-zinc-500">
+                Select an element in the preview and ask Destoc to improve it. Generated diffs will appear here.
+              </p>
+            </div>
           </div>
         )}
       </div>

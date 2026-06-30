@@ -6,6 +6,8 @@ All notable project decisions and changes are recorded here.
 
 ### Added
 
+- A reusable evidence-bound design-review system prompt that encodes implementation-first interface rules, accessibility constraints, safe patch behavior, and honest user-facing summaries.
+- A second curated Codex transcript covering sandbox hydration, workspace-manager, landing-page, and chatbot refinements.
 - Project operating guidance in `AGENTS.md`.
 - Task tracking in `TODOS.md`.
 - Explicit scope for the first implementation: email/password auth, public repository URL import, sandbox-only revisions, and a deterministic review provider.
@@ -20,6 +22,9 @@ All notable project decisions and changes are recorded here.
 
 ### Changed
 
+- The landing page now uses stronger directional contrast, session-aware authentication actions, and a top-right `D.` mark while preserving the pixel-art visual direction.
+- Chat review completions now type out the provider’s user-facing summary, and accepted-change messages identify the applied change and sandbox rebuild instead of returning generic status copy.
+- The code-changes pane now has a centered workflow-oriented empty state with an animated file-edit icon.
 - The workspace manager now uses a compact Vercel-like shell with a thin navigation bar, dense repository rows, restrained radii, explicit dividers, and a focused import panel that adapts cleanly to narrow screens.
 - Next.js sandbox previews now build and run in production mode so failed development HMR WebSockets cannot block React hydration, interactions, or animation effects; accepted changes rebuild and restart the production preview automatically.
 - Preview media recovery is now limited to near-viewport lazy images after the page load event and no longer overrides repository opacity, filter, or fetch-priority behavior.
