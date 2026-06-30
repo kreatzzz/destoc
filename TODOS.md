@@ -2,14 +2,13 @@
 
 ## In progress
 
-- [ ] Configure a live DeepSeek provider and validate structured reviews against real component evidence.
-- [ ] Validate preview startup across more framework/package-manager variants and add persisted screenshot capture.
-- [ ] Add a repository capability scanner so non-web imports are flagged before users start a sandbox.
-- [ ] Add per-project runtime host/env allowlists for previews that legitimately depend on third-party services.
+- No code-only tasks are currently in progress. The remaining items require provider credentials, product scope, or additional infrastructure.
 
 ## Deliberately deferred
 
 - [ ] DeepSeek runtime provider configuration and live AI generation.
+- [ ] Per-project runtime host/environment allowlists for previews that depend on third-party services.
+- [ ] Persisted before/after screenshot capture; this requires a production browser-capture service and configured Blob storage.
 - [ ] GitHub OAuth, private repositories, GitHub writes, pull requests, webhooks, and scheduled reviews.
 - [ ] Full remote preview bridge and production Vercel Sandbox wiring where credentials are unavailable locally.
 - [ ] `DESIGN.md`, to be created after core implementation using google-labs-code/design.md.
@@ -28,3 +27,5 @@
 - [x] Make new sandbox sessions start fresh from repository source instead of replaying older accepted patches.
 - [x] Move sandbox execution, AI review generation, and accepted patch application to a BullMQ worker backed by Redis.
 - [x] Add a two-service Coolify deployment path with persistent production Codex authentication on the worker.
+- [x] Add an import-time repository capability scanner with Next.js, generic web-script, package-manager, and workspace-only monorepo diagnostics.
+- [x] Run imported npm, pnpm, Yarn, and Bun projects through their declared package manager during install, build, start, and revision rebuilds.

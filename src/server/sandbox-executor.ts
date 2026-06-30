@@ -48,6 +48,8 @@ type PackageScripts = {
   start?: string;
 };
 
+type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
+
 function truncateLog(value: string): string {
   return value.length <= MAX_PERSISTED_LOG_LENGTH
     ? value
@@ -161,6 +163,32 @@ async function packageScripts(sandbox: Sandbox): Promise<PackageScripts> {
   } catch {
     return {};
   }
+}
+
+async function projectPackageManager(sandbox: Sandbox): Promise<PackageManager> {
+  const check = await sandbox.runCommand({
+    cmd: "node",
+    args: [
+      "-e",
+      [
+        "const fs = require('node:fs');",
+        "const manifest = require('./package.json');",
+        "const declared = typeof manifest.packageManager === 'string' ? manifest.packageManager.split('@')[0] : '';",
+        "const supported = ['npm', 'pnpm', 'yarn', 'bun'];",
+        "if (supported.includes(declared)) process.stdout.write(declared);",
+        "else if (fs.existsSync('bun.lock') || fs.existsSync('bun.lockb')) process.stdout.write('bun');",
+        "else if (fs.existsSync('pnpm-lock.yaml')) process.stdout.write('pnpm');",
+        "else if (fs.existsSync('yarn.lock')) process.stdout.write('yarn');",
+        "else process.stdout.write('npm');",
+      ].join(" "),
+    ],
+    cwd: sandbox.cwd,
+    timeoutMs: 5_000,
+  });
+  if (check.exitCode !== 0) return "npm";
+
+  const value = (await check.output("stdout")).trim();
+  return value === "pnpm" || value === "yarn" || value === "bun" ? value : "npm";
 }
 
 async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
@@ -332,13 +360,45 @@ async function applyPatchToSandbox(sandbox: Sandbox, patch: string): Promise<str
   return truncateLog(`git apply needed fallback:\n${checkLog}\n${fallbackLog}`);
 }
 
-export function previewStartCommand(nextProject: boolean, scripts: PackageScripts): string {
+function packageRunCommand(packageManager: PackageManager, script: string) {
+  return `${packageManager} run ${script}`;
+}
+
+export function dependencyInstallCommand(packageManager: PackageManager): string {
+  if (packageManager === "pnpm") {
+    return [
+      "if command -v corepack >/dev/null 2>&1; then corepack enable; fi",
+      "if ! command -v pnpm >/dev/null 2>&1; then npm install --global pnpm; fi",
+      "if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi",
+    ].join("; ");
+  }
+  if (packageManager === "yarn") {
+    return [
+      "if command -v corepack >/dev/null 2>&1; then corepack enable; fi",
+      "if ! command -v yarn >/dev/null 2>&1; then npm install --global yarn; fi",
+      "if [ -f yarn.lock ]; then yarn install --immutable || yarn install --frozen-lockfile; else yarn install; fi",
+    ].join("; ");
+  }
+  if (packageManager === "bun") {
+    return [
+      "if ! command -v bun >/dev/null 2>&1; then npm install --global bun; fi",
+      "if [ -f bun.lock ] || [ -f bun.lockb ]; then bun install --frozen-lockfile; else bun install; fi",
+    ].join("; ");
+  }
+  return "if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi";
+}
+
+export function previewStartCommand(
+  nextProject: boolean,
+  scripts: PackageScripts,
+  packageManager: PackageManager = "npm",
+): string {
+  const run = packageRunCommand(packageManager, nextProject ? "start" : scripts.dev ? "dev" : "start");
   if (nextProject) {
-    return `exec npm run start -- -H 0.0.0.0 -p 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
+    return `exec ${run} -- -H 0.0.0.0 -p 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
   }
 
-  const scriptName = scripts.dev ? "dev" : "start";
-  return `HOST=0.0.0.0 PORT=3000 exec npm run ${scriptName} -- --host 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
+  return `HOST=0.0.0.0 PORT=3000 exec ${run} -- --host 0.0.0.0 --port 3000 > ${PREVIEW_LOG_FILE} 2>&1`;
 }
 
 function previewEnvironment(nextProject: boolean) {
@@ -366,9 +426,9 @@ function validatePreviewScripts(nextProject: boolean, scripts: PackageScripts) {
   }
 }
 
-async function buildNextPreview(sandbox: Sandbox): Promise<string> {
+async function buildNextPreview(sandbox: Sandbox, packageManager: PackageManager): Promise<string> {
   const build = await sandbox.runCommand({
-    cmd: "npm",
+    cmd: packageManager,
     args: ["run", "build"],
     cwd: sandbox.cwd,
     env: { NODE_ENV: "production" },
@@ -387,10 +447,15 @@ async function buildNextPreview(sandbox: Sandbox): Promise<string> {
   return buildLog;
 }
 
-async function startProjectPreview(sandbox: Sandbox, nextProject: boolean, scripts: PackageScripts) {
+async function startProjectPreview(
+  sandbox: Sandbox,
+  nextProject: boolean,
+  scripts: PackageScripts,
+  packageManager: PackageManager,
+) {
   await sandbox.runCommand({
     cmd: "sh",
-    args: ["-lc", previewStartCommand(nextProject, scripts)],
+    args: ["-lc", previewStartCommand(nextProject, scripts, packageManager)],
     cwd: sandbox.cwd,
     env: previewEnvironment(nextProject),
     detached: true,
@@ -398,7 +463,11 @@ async function startProjectPreview(sandbox: Sandbox, nextProject: boolean, scrip
   });
 }
 
-async function restartNextPreview(sandbox: Sandbox, scripts: PackageScripts) {
+async function restartNextPreview(
+  sandbox: Sandbox,
+  scripts: PackageScripts,
+  packageManager: PackageManager,
+) {
   await sandbox.runCommand({
     cmd: "sh",
     args: [
@@ -408,7 +477,7 @@ async function restartNextPreview(sandbox: Sandbox, scripts: PackageScripts) {
     cwd: sandbox.cwd,
     timeoutMs: 5_000,
   });
-  await startProjectPreview(sandbox, true, scripts);
+  await startProjectPreview(sandbox, true, scripts, packageManager);
 }
 
 /**
@@ -461,6 +530,7 @@ export async function executeSandboxRun(
     await transitionSandboxRun(userId, input.sandboxRunId, "BUILDING", { logs });
 
     const scripts = await packageScripts(sandbox);
+    const packageManager = await projectPackageManager(sandbox);
     const nextProject = await isNextProject(sandbox);
     validatePreviewScripts(nextProject, scripts);
 
@@ -472,7 +542,7 @@ export async function executeSandboxRun(
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
     }
 
-    logs = appendLog(logs, "Installing project dependencies.");
+    logs = appendLog(logs, `Installing project dependencies with ${packageManager}.`);
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
     const install = await sandbox.runCommand({
       cmd: "sh",
@@ -481,7 +551,7 @@ export async function executeSandboxRun(
         // Dependency lifecycle scripts are required by a number of legitimate
         // web projects. They run only inside the disposable microVM, before
         // app execution, with no host credentials and tightly scoped egress.
-        "if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi",
+        dependencyInstallCommand(packageManager),
       ],
       // Production previews still need devDependencies to build source apps
       // (PostCSS, TypeScript, bundler plugins, etc.). The serving process is
@@ -506,13 +576,13 @@ export async function executeSandboxRun(
     if (nextProject) {
       logs = appendLog(logs, "Building production preview.");
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-      const buildLog = await buildNextPreview(sandbox);
+      const buildLog = await buildNextPreview(sandbox, packageManager);
       logs = appendLog(logs, buildLog);
     }
 
     logs = appendLog(logs, "Starting interactive preview server.");
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-    await startProjectPreview(sandbox, nextProject, scripts);
+    await startProjectPreview(sandbox, nextProject, scripts, packageManager);
 
     const upstreamPort = await waitForLocalPreview(sandbox, PREVIEW_PORTS);
     if (!upstreamPort) {
@@ -660,15 +730,16 @@ export async function applyPatchToExistingSandboxRun(
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
 
     const scripts = await packageScripts(sandbox);
+    const packageManager = await projectPackageManager(sandbox);
     const nextProject = await isNextProject(sandbox);
     validatePreviewScripts(nextProject, scripts);
     if (nextProject) {
       logs = appendLog(logs, "Rebuilding the production preview with the accepted change.");
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-      const buildLog = await buildNextPreview(sandbox);
+      const buildLog = await buildNextPreview(sandbox, packageManager);
       logs = appendLog(logs, buildLog);
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-      await restartNextPreview(sandbox, scripts);
+      await restartNextPreview(sandbox, scripts, packageManager);
       const upstreamPort = await waitForLocalPreview(sandbox, [3000]);
       if (!upstreamPort) {
         throw new AppError("INTERNAL_ERROR", "The preview did not restart after applying the accepted change.", {

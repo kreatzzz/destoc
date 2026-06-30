@@ -85,5 +85,6 @@ The example pins Destoc to `gpt-5.4` with medium reasoning without changing your
 
 - The deterministic mock provider remains the safest free default. Local OpenAI-compatible and command providers are available for experiments, and the DeepSeek provider boundary exists, but the production DeepSeek integration is not yet implemented.
 - Only common public Next.js/Vite-style repositories are in scope. Private repositories, GitHub OAuth, GitHub write-back/PRs, webhooks, and scheduled reviews are deferred.
+- Root-level npm, pnpm, Yarn, and Bun applications are supported; workspace-only monorepos are rejected during import until app-directory selection is implemented.
 - Accepted changes apply to the currently running sandbox only. A new sandbox session intentionally starts from clean repository source.
 - `ai-transcripts/` contains the assignment transcript summary package; raw tool exports can be added there after redaction.

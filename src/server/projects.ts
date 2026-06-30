@@ -8,6 +8,10 @@ import {
 } from "@/lib/schemas";
 import { requireProjectOwnership, requireWorkspaceOwnership } from "@/server/authorization";
 import { enforceRateLimit } from "@/server/rate-limit";
+import {
+  assessRepositoryPreviewCapability,
+  type RepositoryPackageManifest,
+} from "@/server/repository-capabilities";
 
 async function verifyPublicGitHubRepository(owner: string, repository: string, branch: string) {
   const repoResponse = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}`, {
@@ -69,19 +73,16 @@ async function verifyPublicGitHubRepository(owner: string, repository: string, b
     throw new AppError("VALIDATION_ERROR", "Destoc could not read this repository’s package.json.");
   }
 
-  let manifest: { scripts?: Record<string, unknown> };
+  let manifest: RepositoryPackageManifest;
   try {
-    manifest = JSON.parse(Buffer.from(packagePayload.content, "base64").toString("utf8")) as { scripts?: Record<string, unknown> };
+    manifest = JSON.parse(Buffer.from(packagePayload.content, "base64").toString("utf8")) as RepositoryPackageManifest;
   } catch {
     throw new AppError("VALIDATION_ERROR", "This repository has an invalid package.json, so Destoc cannot preview it.");
   }
 
-  const scripts = manifest.scripts ?? {};
-  if (typeof scripts.dev !== "string") {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      "Destoc can import this repository only when package.json defines a dev script for an editable live preview.",
-    );
+  const capability = assessRepositoryPreviewCapability(manifest);
+  if (!capability.supported) {
+    throw new AppError("VALIDATION_ERROR", capability.reason ?? "This repository cannot run in a Destoc preview.");
   }
 }
 
