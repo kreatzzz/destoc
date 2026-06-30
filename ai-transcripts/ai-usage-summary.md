@@ -1,11 +1,16 @@
 # AI Usage Summary
 
-## Tools used
+## AI tool used
 
 - Codex
-- Cursor Design Mode / Agentation-style page feedback
+
+## Supporting references and feedback tools
+
+- Agentation-style page feedback annotations
 - Notion assignment reference
 - shadcn/ui component references
+
+Cursor and OpenCode were not used.
 
 ## What AI helped with
 
@@ -17,6 +22,7 @@
 - Workspace UI iteration, including the repository dashboard, design workspace, chat rail, diff pane, and toolbar interactions.
 - Landing-page visibility, session-aware authentication links, system-prompt design, and user-facing streamed review summaries.
 - Error handling, rate limiting, environment documentation, Docker/Coolify deployment support, and validation commands.
+- BullMQ worker architecture, production Codex handling, repository compatibility diagnostics, and accepted-preview consistency hardening.
 
 ## Important manual decisions
 
@@ -30,10 +36,12 @@
 
 ## Known limitations
 
-- The deterministic mock provider is the safest default while live provider wiring is still being finalized.
-- The DeepSeek provider is intended for production but is not fully connected yet.
-- Public Next.js previews currently expect a root `package.json` with runnable `build` and `start` scripts; other supported web repositories need `dev` or `start`.
+- The current private production experiment uses an authenticated Codex CLI
+  worker. DeepSeek remains a future provider option.
+- Next.js previews expect a root `package.json` with runnable `build` and `start` scripts; other supported root web repositories need `dev` or `start`.
 - Accepted patches apply to the currently running sandbox only; new sessions intentionally start from clean repository source.
 - Code patching is best-effort and limited to safe UI/source paths.
-- The command provider is local and experimental; it should not be treated as hosted production AI infrastructure.
-- Vercel Sandbox credentials are required for imported repository previews.
+- The command provider is deployed for a private experiment, but device authentication can expire and it should not be treated as a shared multi-tenant AI gateway.
+- The checked-in transcript artifact is a selected copied/redacted excerpt plus
+  curated records, not an unsafe full export of a thread that contained
+  credentials.

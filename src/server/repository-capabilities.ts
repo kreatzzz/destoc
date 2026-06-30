@@ -13,6 +13,21 @@ export type PreviewCapability = {
   reason?: string;
 };
 
+function isOptionalRecord(value: unknown): value is Record<string, unknown> | undefined {
+  return value === undefined
+    || (value !== null && typeof value === "object" && !Array.isArray(value));
+}
+
+export function isRepositoryPackageManifest(
+  value: unknown,
+): value is RepositoryPackageManifest {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const manifest = value as Record<string, unknown>;
+  return isOptionalRecord(manifest.scripts)
+    && isOptionalRecord(manifest.dependencies)
+    && isOptionalRecord(manifest.devDependencies);
+}
+
 function packageManagerName(value: unknown): PreviewCapability["packageManager"] {
   if (typeof value !== "string") return undefined;
   const name = value.split("@", 1)[0];

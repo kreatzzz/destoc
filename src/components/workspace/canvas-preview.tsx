@@ -38,8 +38,10 @@ export function CanvasPreview({
   const inspectIconRef = useRef<EyeIconHandle>(null);
   const previewSource = useMemo(() => {
     if (!previewUrl) return undefined;
-    return previewUrl;
-  }, [previewUrl]);
+    const url = new URL(previewUrl);
+    url.searchParams.set("__destoc_reload", String(previewReloadKey));
+    return url.toString();
+  }, [previewReloadKey, previewUrl]);
 
   useEffect(() => {
     if (!previewUrl) return;

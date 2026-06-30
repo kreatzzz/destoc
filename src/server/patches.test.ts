@@ -16,6 +16,17 @@ describe("assertPatchIsAllowed", () => {
     expect(() => assertPatchIsAllowed(validPatch, "src/components/Hero.tsx")).not.toThrow();
   });
 
+  it.each([
+    "src/App.tsx",
+    "src/main.tsx",
+    "src/index.css",
+    "pages/index.tsx",
+    "styles/globals.css",
+  ])("allows common editable UI entry point %s", (path) => {
+    const patch = validPatch.replaceAll("src/components/Hero.tsx", path);
+    expect(() => assertPatchIsAllowed(patch, path)).not.toThrow();
+  });
+
   it("rejects an environment-file patch", () => {
     const unsafePatch = validPatch.replaceAll("src/components/Hero.tsx", ".env.local");
     expect(() => assertPatchIsAllowed(unsafePatch)).toThrow(AppError);

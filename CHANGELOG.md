@@ -4,8 +4,14 @@ All notable project decisions and changes are recorded here.
 
 ## Unreleased
 
+Current behavior is described by `README.md`, `ARCHITECTURE.md`,
+`SUPPORTED_REPOSITORIES.md`, and `DESIGN.md`. Entries below preserve the
+chronology of intermediate iterations and may describe behavior that was later
+replaced in the same unreleased development cycle.
+
 ### Added
 
+- Final submission documentation covering architecture, assumptions, trade-offs, supported repositories, deliverable status, and the third curated Codex transcript.
 - Import-time repository capability diagnostics that reject incomplete Next.js previews and workspace-only/non-runnable repositories before a sandbox job is created.
 - Sandbox previews now detect npm, pnpm, Yarn, and Bun projects and preserve that package manager through dependency installation, build, startup, and accepted-change rebuilds.
 - A Redis-backed BullMQ worker for sandbox execution, AI review generation, and accepted revision application, with persisted polling state and stalled-job recovery.
@@ -26,6 +32,16 @@ All notable project decisions and changes are recorded here.
 
 ### Changed
 
+- Transcript artifacts now identify Codex as the only AI coding assistant and
+  distinguish Agentation page feedback from AI-tool usage; no Cursor or
+  OpenCode usage is claimed.
+- Patch completion now requires a valid non-empty sandbox working-tree diff,
+  an exact-token preview bridge restart, and a healthy upstream before the
+  revision is marked ready.
+- Patch paths now include common Vite entry files plus Next.js Pages Router and
+  styles directories, while concurrent accepted changes to one preview are
+  rejected until the active revision finishes.
+- Accepted revisions now restart and verify both the application and preview bridge before completion, while preview responses disable stale service-worker and HTTP caching.
 - Production Codex invocations now bypass the Git repository trust check for the isolated worker application directory, and workspace prompts expose a cost-oriented 100-word limit with a live counter.
 - The workspace composer footer is denser, with a compact cost-info control positioned directly beside the word counter.
 - Fixed production standalone packaging so Next.js CSS, JavaScript chunks, public images, and image optimization assets are served from the deployed container.
@@ -79,7 +95,7 @@ All notable project decisions and changes are recorded here.
 - Workspace chat now separates user and Destoc messages more clearly, removes accepted checkmark confirmation cards, streams acceptance/completion text, and keeps accepted diffs across prompts.
 - Sandbox previews now require an editable `dev` script, use clearer incompatible-repository errors, and allow public runtime egress so external assets can render.
 - Failed patch applications now return suggestions to a retryable state instead of leaving them visually accepted.
-- Added the assignment `ai-transcripts/` package with an AI usage summary, curated Codex session notes, Cursor/page-feedback notes, and OpenCode link placeholder.
+- Added the assignment `ai-transcripts/` package with an AI usage summary, curated Codex session notes, and Agentation/page-feedback annotations.
 - The `/workspace` repository dashboard now uses a more structured warm container system around the existing content without changing the page copy.
 - New sandbox sessions now start fresh from repository source instead of replaying older accepted patches, avoiding stale patch carryover and white-screen regressions.
 - Sandbox preview startup now runs dev servers with explicit development-mode environment settings and faster npm install flags.

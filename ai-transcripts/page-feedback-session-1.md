@@ -1,6 +1,9 @@
-# Cursor Design Mode / Page Feedback Session 1
+# Agentation / Page Feedback Session 1
 
-This is a curated summary of the visual feedback loops used during implementation. It is not a raw Cursor transcript export.
+This is a curated summary of the user-authored visual feedback annotations
+supplied during implementation. The feedback was collected through Agentation
+page annotations and the Codex conversation. It is design evidence, not a
+second AI-tool transcript.
 
 ## Captured feedback themes
 
@@ -10,7 +13,7 @@ This is a curated summary of the visual feedback loops used during implementatio
 - Put selected component pills above the chat composer.
 - Keep the Select and Inspect controls at the bottom of the preview.
 - Remove redundant design-mode and suggestion controls.
-- Convert destructive project actions to icon-only controls with proper confirmation UI.
+- Convert destructive project actions to icon-only controls with confirmation UI.
 - Center the code-changes icon in the workspace top bar.
 - Use a minimal yellow `D.` logo instead of a filled badge.
 - Improve message distinction between user and assistant.
@@ -21,4 +24,4 @@ This is a curated summary of the visual feedback loops used during implementatio
 
 ## Manual review note
 
-If raw Cursor exports are required, add them here after redacting secrets and private identifiers.
+This file summarizes user-authored visual feedback; it does not claim a separate AI-tool session.

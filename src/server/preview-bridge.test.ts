@@ -23,4 +23,23 @@ describe("createPreviewBridgeProxyScript", () => {
     expect(bridge).toContain('rootMargin: "800px 0px"');
     expect(bridge).toContain('window.addEventListener("load", start');
   });
+
+  it("prevents stale service-worker and HTTP caches inside previews", () => {
+    const proxy = createPreviewBridgeProxyScript(3_000);
+    const bridge = embeddedBridgeSource(proxy);
+
+    expect(proxy).toContain('"if-none-match"');
+    expect(proxy).toContain('"cache-control"] = "no-store, max-age=0"');
+    expect(proxy).toContain('request.headers["service-worker"]');
+    expect(bridge).toContain("registration.unregister()");
+    expect(bridge).toContain("window.caches.delete(key)");
+  });
+
+  it("embeds an exact post-restart verification token", () => {
+    const proxy = createPreviewBridgeProxyScript(3_000, "revision-123");
+
+    expect(proxy).toContain('const VERIFICATION_TOKEN = "revision-123"');
+    expect(proxy).toContain('request.url === "/__destoc/health"');
+    expect(proxy).toContain("upstreamPort: UPSTREAM_PORT");
+  });
 });

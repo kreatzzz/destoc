@@ -24,6 +24,21 @@ const DESIGN_MODE_BRIDGE_SOURCE = String.raw`(() => {
   let markerLayer = null;
   let selectedElements = [];
 
+  function clearPreviewCaches() {
+    if ("serviceWorker" in navigator && typeof navigator.serviceWorker.getRegistrations === "function") {
+      navigator.serviceWorker.getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .catch(() => undefined);
+    }
+    if ("caches" in window && typeof window.caches.keys === "function") {
+      window.caches.keys()
+        .then((keys) => Promise.all(keys.map((key) => window.caches.delete(key))))
+        .catch(() => undefined);
+    }
+  }
+
+  clearPreviewCaches();
+
   function post(type, payload) {
     if (window.parent === window) return;
     window.parent.postMessage({ source: BRIDGE_SOURCE, type, payload }, "*");
@@ -446,12 +461,19 @@ export const PREVIEW_BRIDGE_PROTOCOL = {
  * Sandbox. The proxy is intentionally bound to localhost upstream; requests
  * can never be redirected to arbitrary hosts by a preview request.
  */
-export function createPreviewBridgeProxyScript(upstreamPort: number): string {
+export function createPreviewBridgeProxyScript(
+  upstreamPort: number,
+  verificationToken = "initial-preview",
+): string {
   if (!Number.isInteger(upstreamPort) || upstreamPort < 1 || upstreamPort > 65_535) {
     throw new Error("Preview bridge requires a valid upstream port.");
   }
+  if (!verificationToken || verificationToken.length > 200) {
+    throw new Error("Preview bridge requires a bounded verification token.");
+  }
 
   const bridgeBase64 = Buffer.from(DESIGN_MODE_BRIDGE_SOURCE, "utf8").toString("base64");
+  const verificationTokenJson = JSON.stringify(verificationToken);
 
   return String.raw`"use strict";
 const http = require("node:http");
@@ -460,14 +482,16 @@ const { Transform } = require("node:stream");
 
 const UPSTREAM_PORT = ${upstreamPort};
 const PROXY_PORT = 3001;
+const VERIFICATION_TOKEN = ${verificationTokenJson};
 const BRIDGE = Buffer.from("${bridgeBase64}", "base64").toString("utf8");
 const HOP_BY_HOP = new Set(["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade"]);
-const RESPONSE_HEADERS_TO_REMOVE = new Set([...HOP_BY_HOP, "content-length", "content-encoding", "content-security-policy", "content-security-policy-report-only", "x-frame-options"]);
+const REQUEST_HEADERS_TO_REMOVE = new Set([...HOP_BY_HOP, "host", "if-modified-since", "if-none-match"]);
+const RESPONSE_HEADERS_TO_REMOVE = new Set([...HOP_BY_HOP, "cache-control", "content-length", "content-encoding", "content-security-policy", "content-security-policy-report-only", "etag", "expires", "last-modified", "service-worker-allowed", "x-frame-options"]);
 
 function requestHeaders(headers) {
   const result = {};
   for (const [key, value] of Object.entries(headers)) {
-    if (value === undefined || HOP_BY_HOP.has(key.toLowerCase()) || key.toLowerCase() === "host") continue;
+    if (value === undefined || REQUEST_HEADERS_TO_REMOVE.has(key.toLowerCase())) continue;
     result[key] = value;
   }
   result.host = "127.0.0.1:" + UPSTREAM_PORT;
@@ -484,6 +508,9 @@ function responseHeaders(headers) {
     if (value === undefined || RESPONSE_HEADERS_TO_REMOVE.has(key.toLowerCase())) continue;
     result[key] = value;
   }
+  result["cache-control"] = "no-store, max-age=0";
+  result.pragma = "no-cache";
+  result.expires = "0";
   return result;
 }
 
@@ -558,6 +585,46 @@ function proxyUpgrade(request, socket, head) {
 }
 
 const server = http.createServer((request, response) => {
+  if (request.url === "/__destoc/health") {
+    const upstreamHealth = http.request({
+      hostname: "127.0.0.1",
+      port: UPSTREAM_PORT,
+      method: "HEAD",
+      path: "/",
+      headers: { "cache-control": "no-cache" },
+    }, (upstreamResponse) => {
+      upstreamResponse.resume();
+      response.writeHead(200, {
+        "cache-control": "no-store, max-age=0",
+        "content-type": "application/json; charset=utf-8",
+      });
+      response.end(JSON.stringify({
+        ok: true,
+        token: VERIFICATION_TOKEN,
+        upstreamPort: UPSTREAM_PORT,
+      }));
+    });
+    upstreamHealth.setTimeout(2000, () => upstreamHealth.destroy());
+    upstreamHealth.on("error", () => {
+      response.writeHead(503, {
+        "cache-control": "no-store, max-age=0",
+        "content-type": "application/json; charset=utf-8",
+      });
+      response.end(JSON.stringify({ ok: false }));
+    });
+    upstreamHealth.end();
+    return;
+  }
+
+  if (String(request.headers["service-worker"] || "").toLowerCase() === "script") {
+    response.writeHead(404, {
+      "cache-control": "no-store, max-age=0",
+      "content-type": "text/plain; charset=utf-8",
+    });
+    response.end("Service workers are disabled inside Destoc previews.");
+    return;
+  }
+
   const upstream = http.request({
     hostname: "127.0.0.1",
     port: UPSTREAM_PORT,

@@ -34,6 +34,21 @@ export async function acceptSuggestion(userId: string, suggestionId: string) {
     }
 
     return await getPrisma().$transaction(async (transaction) => {
+      const activeRevision = await transaction.revision.findFirst({
+        where: {
+          sandboxRunId,
+          status: { in: ["QUEUED", "APPLYING"] },
+          NOT: { suggestionId: suggestion.id },
+        },
+        select: { id: true },
+      });
+      if (activeRevision) {
+        throw new AppError(
+          "CONFLICT",
+          "Another accepted change is still being applied to this preview. Wait for it to finish and try again.",
+        );
+      }
+
       const existingRevision = await transaction.revision.findUnique({
         where: { suggestionId: suggestion.id },
       });

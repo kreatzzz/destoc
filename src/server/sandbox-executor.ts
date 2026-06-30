@@ -1,4 +1,5 @@
 import { Sandbox } from "@vercel/sandbox";
+import { randomUUID } from "node:crypto";
 import { getPrisma } from "@/lib/db";
 import { AppError, asAppError } from "@/lib/errors";
 import { requireProjectOwnership } from "@/server/authorization";
@@ -15,6 +16,7 @@ const INSTALL_TIMEOUT_MS = 4 * 60 * 1_000;
 const BUILD_TIMEOUT_MS = 4 * 60 * 1_000;
 const PREVIEW_START_TIMEOUT_MS = SANDBOX_TIMEOUT_MS - 60_000;
 const PREVIEW_HEALTH_CHECK_TIMEOUT_MS = 60_000;
+const PREVIEW_STOP_TIMEOUT_MS = 15_000;
 const MAX_PERSISTED_LOG_LENGTH = 20_000;
 const PREVIEW_LOG_FILE = ".destoc-preview.log";
 const PREVIEW_PORTS = [3000, 5173, 4173, 4321, 8080] as const;
@@ -115,6 +117,26 @@ async function waitForLocalPreview(sandbox: Sandbox, ports: readonly number[]): 
   return undefined;
 }
 
+async function waitForLocalPreviewStop(sandbox: Sandbox, ports: readonly number[]): Promise<boolean> {
+  const deadline = Date.now() + PREVIEW_STOP_TIMEOUT_MS;
+  const portList = JSON.stringify(ports);
+
+  while (Date.now() < deadline) {
+    const check = await sandbox.runCommand({
+      cmd: "node",
+      args: [
+        "-e",
+        `Promise.all(${portList}.map((port) => fetch("http://127.0.0.1:" + port, { signal: AbortSignal.timeout(1000) }).then(() => true).catch(() => false))).then((results) => process.exit(results.some(Boolean) ? 1 : 0))`,
+      ],
+      timeoutMs: 3_000,
+    });
+    if (check.exitCode === 0) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  return false;
+}
+
 async function readPreviewLog(sandbox: Sandbox): Promise<string> {
   try {
     return truncateLog(await sandbox.fs.readFile(`${sandbox.cwd}/${PREVIEW_LOG_FILE}`, "utf8"));
@@ -191,9 +213,17 @@ async function projectPackageManager(sandbox: Sandbox): Promise<PackageManager> 
   return value === "pnpm" || value === "yarn" || value === "bun" ? value : "npm";
 }
 
-async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
+async function startPreviewBridge(
+  sandbox: Sandbox,
+  upstreamPort: number,
+  verificationToken = "initial-preview",
+) {
   const bridgePath = `${sandbox.cwd}/.destoc-preview-bridge.cjs`;
-  await sandbox.fs.writeFile(bridgePath, createPreviewBridgeProxyScript(upstreamPort), "utf8");
+  await sandbox.fs.writeFile(
+    bridgePath,
+    createPreviewBridgeProxyScript(upstreamPort, verificationToken),
+    "utf8",
+  );
 
   await sandbox.runCommand({
     cmd: "node",
@@ -209,7 +239,7 @@ async function startPreviewBridge(sandbox: Sandbox, upstreamPort: number) {
     });
   }
 
-  return proxy.url;
+  return { previewUrl: proxy.url, verificationToken };
 }
 
 function createExactPatchFallbackScript() {
@@ -360,6 +390,40 @@ async function applyPatchToSandbox(sandbox: Sandbox, patch: string): Promise<str
   return truncateLog(`git apply needed fallback:\n${checkLog}\n${fallbackLog}`);
 }
 
+async function verifySandboxWorkingTree(sandbox: Sandbox): Promise<string> {
+  const check = await sandbox.runCommand({
+    cmd: "git",
+    args: ["diff", "--check"],
+    cwd: sandbox.cwd,
+    timeoutMs: 15_000,
+  });
+  const checkLog = await commandLog(check);
+  if (check.exitCode !== 0) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "The accepted patch left invalid conflict markers or whitespace errors.",
+      { cause: checkLog },
+    );
+  }
+
+  const stat = await sandbox.runCommand({
+    cmd: "git",
+    args: ["diff", "--stat"],
+    cwd: sandbox.cwd,
+    timeoutMs: 15_000,
+  });
+  const statLog = await commandLog(stat);
+  if (stat.exitCode !== 0 || !statLog.trim()) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "The accepted patch did not produce a source change in the sandbox.",
+      { cause: statLog },
+    );
+  }
+
+  return statLog;
+}
+
 function packageRunCommand(packageManager: PackageManager, script: string) {
   return `${packageManager} run ${script}`;
 }
@@ -414,14 +478,14 @@ function validatePreviewScripts(nextProject: boolean, scripts: PackageScripts) {
   if (nextProject && (!scripts.build || !scripts.start)) {
     throw new AppError(
       "VALIDATION_ERROR",
-      "This Next.js repository must define npm build and start scripts to run an interactive preview.",
+      "This Next.js repository must define package build and start scripts to run an interactive preview.",
     );
   }
 
   if (!nextProject && !scripts.dev && !scripts.start) {
     throw new AppError(
       "VALIDATION_ERROR",
-      "This repository must define an npm dev or start script to run an interactive preview.",
+      "This repository must define a package dev or start script to run an interactive preview.",
     );
   }
 }
@@ -463,21 +527,106 @@ async function startProjectPreview(
   });
 }
 
-async function restartNextPreview(
-  sandbox: Sandbox,
-  scripts: PackageScripts,
-  packageManager: PackageManager,
-) {
+export function previewStopCommand(signal: "TERM" | "KILL" = "TERM") {
+  const patterns = [
+    "[.]destoc-preview-bridge[.]cjs",
+    "[n]ext start",
+    "[n]ext-server",
+    "[n]pm run dev",
+    "[n]pm run start",
+    "[p]npm run dev",
+    "[p]npm run start",
+    "[y]arn run dev",
+    "[y]arn run start",
+    "[b]un run dev",
+    "[b]un run start",
+    "[v]ite",
+    "[a]stro dev",
+    "[r]eact-scripts start",
+    "[p]arcel",
+    "[r]emix",
+  ];
+  return patterns.map((pattern) => `pkill -${signal} -f '${pattern}' 2>/dev/null || true`).join("; ");
+}
+
+async function stopProjectPreview(sandbox: Sandbox) {
   await sandbox.runCommand({
     cmd: "sh",
-    args: [
-      "-lc",
-      "pkill -TERM -f '[n]ext start' 2>/dev/null || true; pkill -TERM -f '[n]pm run start' 2>/dev/null || true; sleep 1",
-    ],
+    args: ["-lc", previewStopCommand("TERM")],
     cwd: sandbox.cwd,
     timeoutMs: 5_000,
   });
-  await startProjectPreview(sandbox, true, scripts, packageManager);
+  if (await waitForLocalPreviewStop(sandbox, [...PREVIEW_PORTS, 3001])) return;
+
+  await sandbox.runCommand({
+    cmd: "sh",
+    args: ["-lc", previewStopCommand("KILL")],
+    cwd: sandbox.cwd,
+    timeoutMs: 5_000,
+  });
+  if (await waitForLocalPreviewStop(sandbox, [...PREVIEW_PORTS, 3001])) return;
+
+  throw new AppError(
+    "INTERNAL_ERROR",
+    "The previous preview process did not stop cleanly, so the accepted change was not marked complete.",
+    { expose: true },
+  );
+}
+
+async function restartProjectPreview(
+  sandbox: Sandbox,
+  nextProject: boolean,
+  scripts: PackageScripts,
+  packageManager: PackageManager,
+) {
+  await stopProjectPreview(sandbox);
+  await startProjectPreview(sandbox, nextProject, scripts, packageManager);
+  const upstreamPort = await waitForLocalPreview(sandbox, PREVIEW_PORTS);
+  if (!upstreamPort) {
+    throw new AppError("INTERNAL_ERROR", "The preview did not restart after applying the accepted change.", {
+      expose: true,
+      cause: await readPreviewLog(sandbox),
+    });
+  }
+
+  const bridge = await startPreviewBridge(sandbox, upstreamPort, randomUUID());
+  return { ...bridge, upstreamPort };
+}
+
+async function verifyRevisionPreview(
+  previewUrl: string,
+  verificationToken: string,
+  upstreamPort: number,
+) {
+  const url = new URL(previewUrl);
+  url.pathname = "/__destoc/health";
+  url.search = "";
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: { "cache-control": "no-cache" },
+    redirect: "follow",
+    signal: AbortSignal.timeout(5_000),
+  }).catch(() => null);
+
+  const payload = response?.ok
+    ? await response.json().catch(() => null) as {
+      ok?: boolean;
+      token?: string;
+      upstreamPort?: number;
+    } | null
+    : null;
+
+  if (
+    !payload?.ok
+    || payload.token !== verificationToken
+    || payload.upstreamPort !== upstreamPort
+  ) {
+    throw new AppError(
+      "INTERNAL_ERROR",
+      "The rebuilt preview did not return the expected post-change verification token.",
+      { expose: true },
+    );
+  }
 }
 
 /**
@@ -538,7 +687,8 @@ export async function executeSandboxRun(
       logs = appendLog(logs || `Provisioned sandbox ${sandbox.name}.`, "Applying requested patch.");
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
       const patchLog = await applyPatchToSandbox(sandbox, input.patch);
-      logs = appendLog(logs, `Patch apply result:\n${patchLog}`);
+      const diffStat = await verifySandboxWorkingTree(sandbox);
+      logs = appendLog(logs, `Patch apply result:\n${patchLog}\nWorking tree:\n${diffStat}`);
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
     }
 
@@ -596,11 +746,11 @@ export async function executeSandboxRun(
 
     logs = appendLog(logs, `Starting preview bridge for upstream port ${upstreamPort}.`);
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-    const previewUrl = await startPreviewBridge(sandbox, upstreamPort);
+    const bridge = await startPreviewBridge(sandbox, upstreamPort);
 
     const readyRun = await transitionSandboxRun(userId, input.sandboxRunId, "READY", {
-      previewUrl,
-      logs: appendLog(logs, `Preview bridge ready at ${previewUrl} (upstream port ${upstreamPort})`),
+      previewUrl: bridge.previewUrl,
+      logs: appendLog(logs, `Preview bridge ready at ${bridge.previewUrl} (upstream port ${upstreamPort})`),
     });
     if (input.revisionId) {
       await transitionRevision(userId, input.revisionId, "READY");
@@ -718,6 +868,11 @@ export async function applyPatchToExistingSandboxRun(
   const credentials = getSandboxCredentials();
   await transitionRevision(userId, input.revisionId, "APPLYING");
   let logs = appendLog(run.logs ?? "", "Applying accepted patch to the running sandbox.");
+  await transitionSandboxRun(userId, input.sandboxRunId, "BUILDING", {
+    logs,
+    errorCode: null,
+    errorMessage: null,
+  });
 
   try {
     const sandbox = await Sandbox.get({
@@ -726,7 +881,8 @@ export async function applyPatchToExistingSandboxRun(
       resume: false,
     });
     const patchLog = await applyPatchToSandbox(sandbox, input.patch);
-    logs = appendLog(logs, `Patch apply result:\n${patchLog}`);
+    const diffStat = await verifySandboxWorkingTree(sandbox);
+    logs = appendLog(logs, `Patch apply result:\n${patchLog}\nWorking tree:\n${diffStat}`);
     await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
 
     const scripts = await packageScripts(sandbox);
@@ -739,27 +895,39 @@ export async function applyPatchToExistingSandboxRun(
       const buildLog = await buildNextPreview(sandbox, packageManager);
       logs = appendLog(logs, buildLog);
       await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
-      await restartNextPreview(sandbox, scripts, packageManager);
-      const upstreamPort = await waitForLocalPreview(sandbox, [3000]);
-      if (!upstreamPort) {
-        throw new AppError("INTERNAL_ERROR", "The preview did not restart after applying the accepted change.", {
-          expose: true,
-          cause: await readPreviewLog(sandbox),
-        });
-      }
     }
 
+    logs = appendLog(logs, "Restarting the application and preview bridge from the patched source.");
+    await updateSandboxRunProgress(userId, input.sandboxRunId, { logs });
+    const restarted = await restartProjectPreview(sandbox, nextProject, scripts, packageManager);
+    await verifyRevisionPreview(
+      restarted.previewUrl,
+      restarted.verificationToken,
+      restarted.upstreamPort,
+    );
+    logs = appendLog(
+      logs,
+      `Verified patched preview on upstream port ${restarted.upstreamPort}.`,
+    );
+    const readyRun = await transitionSandboxRun(userId, input.sandboxRunId, "READY", {
+      previewUrl: restarted.previewUrl,
+      logs,
+      errorCode: null,
+      errorMessage: null,
+    });
+
     await transitionRevision(userId, input.revisionId, "READY");
-    return getPrisma().sandboxRun.findUniqueOrThrow({ where: { id: input.sandboxRunId } });
+    return readyRun;
   } catch (error) {
     const appError = asAppError(error);
     logs = appendLog(logs, `Failure details:\n${String(appError.cause ?? appError.message)}`);
-    await updateSandboxRunProgress(userId, input.sandboxRunId, {
+    await transitionSandboxRun(userId, input.sandboxRunId, "FAILED", {
+      previewUrl: null,
       logs,
       errorCode: appError.code,
       errorMessage: appError.expose ? appError.message : "Patch application failed.",
-    }).catch((updateError: unknown) => {
-      console.error("Failed to persist patch-application failure", updateError);
+    }).catch((transitionError: unknown) => {
+      console.error("Failed to persist sandbox patch failure", transitionError);
     });
     await transitionRevision(userId, input.revisionId, "FAILED", {
       errorCode: appError.code,

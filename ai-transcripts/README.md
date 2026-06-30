@@ -1,13 +1,29 @@
-# AI transcripts
+# AI-assisted work record
 
-This folder exists for the take-home assignment submission requirement.
+Codex was the AI coding assistant used to build Destoc. Cursor and OpenCode were
+not used.
 
-Raw transcripts should be added here when exported from the tools used during implementation. Do not include secrets, API tokens, private repository credentials, database URLs, or personally sensitive data.
+The files in this directory are deliberately labelled as curated records, not
+raw exports. They preserve the material requests, implementation decisions, and
+verification results while excluding credentials, device codes, database URLs,
+and other secrets that appeared during development.
 
-Current files:
+## Contents
 
-- `codex-session-1.md` — curated Codex implementation-session summary and prompt log.
-- `codex-session-2.md` — curated sandbox, workspace, landing, and chatbot refinement summary.
-- `cursor-session-1.md` — curated Cursor Design Mode / page-feedback summary.
-- `ai-usage-summary.md` — required summary of AI tools, assisted work, manual decisions, and known limitations.
-- `opencode-share-links.md` — placeholder noting that OpenCode share links were not used.
+- `ai-usage-summary.md` — tool provenance, assisted work, manual decisions, and
+  limitations.
+- `codex-session-1.md` — foundation, sandbox, selection, patching, and workspace
+  work.
+- `codex-session-2.md` — interaction diagnosis and product/UI refinement.
+- `codex-session-3.md` — production worker, deployment, cost controls, and
+  accepted-patch consistency.
+- `codex-session-excerpts.md` — selected copied and secret-redacted user/Codex
+  exchanges from the implementation thread.
+- `page-feedback-session-1.md` — user-authored Agentation/page-feedback
+  annotations; this is supporting design evidence, not a separate AI transcript.
+
+## Submission note
+
+The excerpts satisfy the assignment's copied-chat-log option while keeping the
+submission bounded and safe. A full raw export is intentionally not committed
+because the development thread contains credentials and private identifiers.

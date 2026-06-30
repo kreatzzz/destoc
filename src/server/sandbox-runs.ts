@@ -10,7 +10,7 @@ const allowedTransitions: Record<SandboxRunStatus, readonly SandboxRunStatus[]> 
   QUEUED: ["PROVISIONING", "FAILED", "STOPPED"],
   PROVISIONING: ["BUILDING", "FAILED", "STOPPED"],
   BUILDING: ["READY", "FAILED", "STOPPED"],
-  READY: ["STOPPED", "FAILED"],
+  READY: ["BUILDING", "STOPPED", "FAILED"],
   FAILED: [],
   STOPPED: [],
 };
@@ -30,10 +30,10 @@ export async function transitionSandboxRun(
   nextStatus: SandboxRunStatus,
   metadata: {
     commitSha?: string;
-    previewUrl?: string;
+    previewUrl?: string | null;
     logs?: string;
-    errorCode?: string;
-    errorMessage?: string;
+    errorCode?: string | null;
+    errorMessage?: string | null;
   } = {},
 ) {
   const run = await getPrisma().sandboxRun.findFirst({
@@ -61,9 +61,10 @@ export async function updateSandboxRunProgress(
   userId: string,
   sandboxRunId: string,
   metadata: {
+    previewUrl?: string;
     logs?: string;
-    errorCode?: string;
-    errorMessage?: string;
+    errorCode?: string | null;
+    errorMessage?: string | null;
   },
 ) {
   const run = await getPrisma().sandboxRun.findFirst({

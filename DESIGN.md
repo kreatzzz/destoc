@@ -170,12 +170,13 @@ Do:
 - Use the golden accent for intent and active states.
 - Use compact, readable chat cards.
 - Make system progress explicit but small.
-- Preserve animation continuity by preferring reload over rebuild when the running preview supports it.
+- Keep rebuild/restart progress visible when an accepted source patch requires
+  a new application process.
 
 Don't:
 
 - Auto-open secondary panes.
 - Put implementation prose in the code pane.
-- Use destructive icons as default project-list actions.
+- Expose destructive actions without confirmation.
 - Add large decorative containers around the preview.
 - Add new brand colors without a clear status purpose.

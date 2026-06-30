@@ -1,6 +1,7 @@
 # Codex Session 1
 
-This is a curated implementation transcript summary for the Codex work performed on Destoc. It is not a fabricated raw transcript. Raw exports from Codex, Cursor, or other AI tools should be added separately if required by the evaluator.
+This is a curated implementation record for the Codex work performed on Destoc.
+It is not presented as a raw transcript.
 
 Secrets, API tokens, database URLs, and private credentials must be redacted before submission.
 
@@ -9,7 +10,7 @@ Secrets, API tokens, database URLs, and private credentials must be redacted bef
 ### Assignment planning
 
 - Planned the design-mode take-home implementation around Next.js, Prisma, PostgreSQL, Tailwind CSS, TypeScript, Better Auth, and Bun.
-- Selected a product direction similar to a lightweight Liveable/Cursor Design Mode flow.
+- Selected a lightweight developer-tool design-mode product direction.
 - Scoped the landing page to minimal auth buttons and focused implementation effort on the core authenticated product.
 
 ### Core product foundation
@@ -67,4 +68,5 @@ Secrets, API tokens, database URLs, and private credentials must be redacted bef
 
 ## Manual review note
 
-This file is intended to satisfy the transcript-folder structure while keeping the submission honest. If exact transcript exports are required, replace or supplement this summary with raw exported logs from the relevant tools.
+If exact transcript exports are required, supplement this record with a
+secret-redacted export of the Codex thread.

@@ -150,6 +150,9 @@ Set `OPENAI_API_KEY` on the worker. The startup script logs the CLI in non-inter
 - Completed queue metadata is retained for one hour (up to 100 jobs); failed metadata is retained for 24 hours (up to 500 jobs).
 - New sandbox sessions intentionally start from clean repository source.
 - Vercel Sandbox remains required for untrusted repository execution. The Oracle VPS runs Destoc and its worker, not imported project code.
+- GitHub repository metadata and source-context requests are anonymous and
+  therefore subject to GitHub's unauthenticated API rate limit. Keep evaluator
+  traffic low until optional server-side GitHub authentication is added.
 - DeepSeek remains a placeholder. Keep the command provider or mock provider until that integration is implemented.
 
 ## Codex production difficulty

@@ -1,6 +1,8 @@
 # Codex Session 2
 
-This is a curated implementation transcript summary for the second recorded Destoc iteration. It is not a fabricated raw transcript. Secrets, authentication tokens, database URLs, and private credentials are intentionally excluded.
+This is a curated implementation record for the second Destoc iteration. It is
+not presented as a raw transcript. Secrets, authentication tokens, database
+URLs, and private credentials are intentionally excluded.
 
 ## Prompt and work log
 
@@ -40,4 +42,4 @@ This is a curated implementation transcript summary for the second recorded Dest
 
 ## Manual review note
 
-Exact raw exports from Codex or Cursor should be added separately if the evaluator requires them. This summary records the material prompts, decisions, and implemented outcomes without exposing secrets.
+Exact raw Codex exports should be added separately if the evaluator requires them. This summary records the material prompts, decisions, and implemented outcomes without exposing secrets.

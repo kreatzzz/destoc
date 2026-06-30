@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { dependencyInstallCommand, previewStartCommand } from "@/server/sandbox-executor";
+import {
+  dependencyInstallCommand,
+  previewStartCommand,
+  previewStopCommand,
+} from "@/server/sandbox-executor";
 
 describe("previewStartCommand", () => {
   it("serves Next.js production output without a development HMR socket", () => {
@@ -33,5 +37,16 @@ describe("dependencyInstallCommand", () => {
     expect(dependencyInstallCommand("pnpm")).toContain("pnpm install --frozen-lockfile");
     expect(dependencyInstallCommand("yarn")).toContain("yarn install --immutable");
     expect(dependencyInstallCommand("bun")).toContain("bun install --frozen-lockfile");
+  });
+});
+
+describe("previewStopCommand", () => {
+  it("stops the bridge and supported framework processes before a patched restart", () => {
+    const command = previewStopCommand();
+
+    expect(command).toContain("destoc-preview-bridge");
+    expect(command).toContain("[n]ext-server");
+    expect(command).toContain("[v]ite");
+    expect(command).toContain("pkill -TERM");
   });
 });

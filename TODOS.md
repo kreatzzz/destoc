@@ -8,10 +8,11 @@
 
 - [ ] DeepSeek runtime provider configuration and live AI generation.
 - [ ] Per-project runtime host/environment allowlists for previews that depend on third-party services.
-- [ ] Persisted before/after screenshot capture; this requires a production browser-capture service and configured Blob storage.
+- [ ] Persisted before/after screenshot capture required by the Option 2 brief;
+  this needs a production browser-capture service and configured Blob storage.
 - [ ] GitHub OAuth, private repositories, GitHub writes, pull requests, webhooks, and scheduled reviews.
-- [ ] Full remote preview bridge and production Vercel Sandbox wiring where credentials are unavailable locally.
-- [ ] `DESIGN.md`, to be created after core implementation using google-labs-code/design.md.
+- [ ] Optional authenticated GitHub API access for higher import/source-context
+  rate limits.
 
 ## Done
 
@@ -29,3 +30,6 @@
 - [x] Add a two-service Coolify deployment path with persistent production Codex authentication on the worker.
 - [x] Add an import-time repository capability scanner with Next.js, generic web-script, package-manager, and workspace-only monorepo diagnostics.
 - [x] Run imported npm, pnpm, Yarn, and Bun projects through their declared package manager during install, build, start, and revision rebuilds.
+- [x] Document the final architecture, assumptions, trade-offs, repository support matrix, design system, and submission checklist.
+- [x] Wire the production worker to Vercel Sandbox and the injected preview
+  bridge.

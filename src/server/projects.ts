@@ -10,6 +10,7 @@ import { requireProjectOwnership, requireWorkspaceOwnership } from "@/server/aut
 import { enforceRateLimit } from "@/server/rate-limit";
 import {
   assessRepositoryPreviewCapability,
+  isRepositoryPackageManifest,
   type RepositoryPackageManifest,
 } from "@/server/repository-capabilities";
 
@@ -73,12 +74,19 @@ async function verifyPublicGitHubRepository(owner: string, repository: string, b
     throw new AppError("VALIDATION_ERROR", "Destoc could not read this repository’s package.json.");
   }
 
-  let manifest: RepositoryPackageManifest;
+  let parsedManifest: unknown;
   try {
-    manifest = JSON.parse(Buffer.from(packagePayload.content, "base64").toString("utf8")) as RepositoryPackageManifest;
+    parsedManifest = JSON.parse(Buffer.from(packagePayload.content, "base64").toString("utf8"));
   } catch {
     throw new AppError("VALIDATION_ERROR", "This repository has an invalid package.json, so Destoc cannot preview it.");
   }
+  if (!isRepositoryPackageManifest(parsedManifest)) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "This repository’s package.json does not have a supported object structure.",
+    );
+  }
+  const manifest: RepositoryPackageManifest = parsedManifest;
 
   const capability = assessRepositoryPreviewCapability(manifest);
   if (!capability.supported) {

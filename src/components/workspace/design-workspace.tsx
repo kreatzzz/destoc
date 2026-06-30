@@ -570,7 +570,7 @@ export function DesignWorkspace({ data = defaultData }: DesignWorkspaceProps) {
       if (completedRevision.sandboxRun) {
         applyRunState(completedRevision.sandboxRun);
         window.setTimeout(() => setPreviewReloadKey((key) => key + 1), 450);
-        streamAssistantMessage(`Applied${changeLabel}. I rebuilt the sandbox preview and refreshed it with the completed change.`);
+        streamAssistantMessage(`Applied${changeLabel}. I restarted and verified the patched sandbox preview, then refreshed it.`);
       }
       router.refresh();
     } catch (error) {

@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/errors";
 
-const allowedUiPath = /^(?:src\/)?(?:app|components|data|content|lib)\/.+\.(?:tsx|jsx|ts|js|css|json|mdx?)$/;
+const allowedUiPath = /^(?:(?:src\/)?(?:app|pages|components|data|content|lib|styles)\/.+|src\/(?:App|main|index)|(?:App|main|index))\.(?:tsx|jsx|ts|js|css|json|mdx?)$/;
 const forbiddenPathSegment = /(^|\/)(?:\.git|node_modules|\.env(?:\.|$)|package(?:-lock)?\.json|bun\.lockb?|pnpm-lock\.yaml|yarn\.lock)(?:\/|$)/;
 
 export function normalizeUnifiedDiff(patch: string): string {

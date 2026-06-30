@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { assessRepositoryPreviewCapability } from "@/server/repository-capabilities";
+import {
+  assessRepositoryPreviewCapability,
+  isRepositoryPackageManifest,
+} from "@/server/repository-capabilities";
+
+describe("isRepositoryPackageManifest", () => {
+  it("rejects null, arrays, and malformed script maps", () => {
+    expect(isRepositoryPackageManifest(null)).toBe(false);
+    expect(isRepositoryPackageManifest([])).toBe(false);
+    expect(isRepositoryPackageManifest({ scripts: "next dev" })).toBe(false);
+  });
+
+  it("accepts a package manifest object with record fields", () => {
+    expect(isRepositoryPackageManifest({
+      scripts: { dev: "vite" },
+      devDependencies: { vite: "7.0.0" },
+    })).toBe(true);
+  });
+});
 
 describe("assessRepositoryPreviewCapability", () => {
   it("accepts a production-runnable Next.js application", () => {
