@@ -136,10 +136,11 @@ Set `OPENAI_API_KEY` on the worker. The startup script logs the CLI in non-inter
 3. Deploy `destoc-worker`.
 4. Check worker logs for `Destoc worker ready with concurrency 1`.
 5. Open `/api/health` on the public domain.
-6. Create an account and import a small public Next.js or Vite repository.
-7. Start a preview and verify the status moves through queued, provisioning, building, and ready.
-8. Send a review prompt and verify the worker runs a `review.execute` job.
-9. Accept a generated patch and verify a `revision.apply` job rebuilds and refreshes the preview.
+6. Confirm a `/_next/static/` stylesheet request returns `200`; unstyled HTML means the deployment is still running an older image.
+7. Create an account and import a small public Next.js or Vite repository.
+8. Start a preview and verify the status moves through queued, provisioning, building, and ready.
+9. Send a review prompt and verify the worker runs a `review.execute` job.
+10. Accept a generated patch and verify a `revision.apply` job rebuilds and refreshes the preview.
 
 ## 7. Operational notes
 

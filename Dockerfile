@@ -37,6 +37,11 @@ RUN bun add --global "@openai/codex@${CODEX_VERSION}" \
   && mkdir -p /data/codex
 
 COPY --from=builder /app ./
+COPY --from=builder /app/.next/static ./.next/standalone/.next/static
+COPY --from=builder /app/public ./.next/standalone/public
+
+RUN test -d .next/standalone/.next/static \
+  && test -f .next/standalone/public/destoc-hero-bg.png
 
 EXPOSE 3000
 
