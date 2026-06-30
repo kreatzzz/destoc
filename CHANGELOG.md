@@ -22,6 +22,7 @@ All notable project decisions and changes are recorded here.
 
 ### Changed
 
+- Repository rows now include an icon-only delete action with a shadcn confirmation dialog, pending state, inline failure feedback, and automatic list refresh.
 - The landing page now uses a lighter directional vignette, a Geist hero heading, session-aware authentication actions, and a combined top-left `D.`/Destoc wordmark while preserving the pixel-art visual direction.
 - Chat review completions now type out the provider’s user-facing summary, and accepted-change messages identify the applied change and sandbox rebuild instead of returning generic status copy.
 - The code-changes pane now has a centered workflow-oriented empty state with an animated file-edit icon.
