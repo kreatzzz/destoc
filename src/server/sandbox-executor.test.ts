@@ -4,7 +4,9 @@ import {
   dependencyInstallCommand,
   previewStartCommand,
   previewStopCommand,
+  sandboxProvisioningError,
 } from "@/server/sandbox-executor";
+import { AppError } from "@/lib/errors";
 
 describe("previewStartCommand", () => {
   it("serves Next.js production output without a development HMR socket", () => {
@@ -48,5 +50,24 @@ describe("previewStopCommand", () => {
     expect(command).toContain("[n]ext-server");
     expect(command).toContain("[v]ite");
     expect(command).toContain("pkill -TERM");
+  });
+});
+
+describe("sandboxProvisioningError", () => {
+  it("turns rejected Vercel credentials into an actionable configuration error", () => {
+    const error = sandboxProvisioningError(new Error("Status code 403 is not ok"));
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error).toMatchObject({
+      code: "CONFIGURATION_ERROR",
+      status: 500,
+      expose: true,
+    });
+    expect((error as Error).message).toContain("Replace VERCEL_TOKEN");
+  });
+
+  it("preserves unrelated provisioning errors", () => {
+    const original = new Error("socket timed out");
+    expect(sandboxProvisioningError(original)).toBe(original);
   });
 });

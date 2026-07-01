@@ -32,6 +32,8 @@ replaced in the same unreleased development cycle.
 
 ### Changed
 
+- Vercel Sandbox authentication failures now surface an actionable credential
+  error instead of the generic sandbox-execution failure.
 - AI review prompting is restricted server-side to the owner account while
   sign-up, login, repository access, and sandbox browsing remain available to
   other authenticated users.

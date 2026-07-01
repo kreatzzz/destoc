@@ -52,6 +52,18 @@ type PackageScripts = {
 
 type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
+export function sandboxProvisioningError(error: unknown): unknown {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/\b(?:401|403)\b/.test(message)) {
+    return new AppError(
+      "CONFIGURATION_ERROR",
+      "Vercel rejected the sandbox credentials. Replace VERCEL_TOKEN and verify that VERCEL_TEAM_ID and VERCEL_PROJECT_ID belong to the same account.",
+      { cause: error },
+    );
+  }
+  return error;
+}
+
 function truncateLog(value: string): string {
   return value.length <= MAX_PERSISTED_LOG_LENGTH
     ? value
@@ -653,27 +665,31 @@ export async function executeSandboxRun(
       await transitionRevision(userId, input.revisionId, "APPLYING");
     }
 
-    sandbox = await Sandbox.create({
-      ...credentials,
-      name: `destoc-${input.sandboxRunId}`,
-      source: {
-        type: "git",
-        url: `${project.githubUrl}.git`,
-        depth: 1,
-        revision: input.commitSha ?? project.defaultBranch,
-      },
-      // Only the Destoc-owned reverse proxy is publicly exposed. The user app
-      // remains reachable solely over localhost inside the VM.
-      ports: [3001],
-      runtime: "node24",
-      env: { NODE_ENV: "development" },
-      resources: { vcpus: 1 },
-      timeout: SANDBOX_TIMEOUT_MS,
-      persistent: false,
-      networkPolicy: {
-        allow: ["github.com", "*.github.com", "registry.npmjs.org", "*.npmjs.org", ...PREVIEW_RUNTIME_HOSTS],
-      },
-    });
+    try {
+      sandbox = await Sandbox.create({
+        ...credentials,
+        name: `destoc-${input.sandboxRunId}`,
+        source: {
+          type: "git",
+          url: `${project.githubUrl}.git`,
+          depth: 1,
+          revision: input.commitSha ?? project.defaultBranch,
+        },
+        // Only the Destoc-owned reverse proxy is publicly exposed. The user app
+        // remains reachable solely over localhost inside the VM.
+        ports: [3001],
+        runtime: "node24",
+        env: { NODE_ENV: "development" },
+        resources: { vcpus: 1 },
+        timeout: SANDBOX_TIMEOUT_MS,
+        persistent: false,
+        networkPolicy: {
+          allow: ["github.com", "*.github.com", "registry.npmjs.org", "*.npmjs.org", ...PREVIEW_RUNTIME_HOSTS],
+        },
+      });
+    } catch (error) {
+      throw sandboxProvisioningError(error);
+    }
 
     logs = `Provisioned sandbox ${sandbox.name}. Inspecting project manifest.`;
     await transitionSandboxRun(userId, input.sandboxRunId, "BUILDING", { logs });
