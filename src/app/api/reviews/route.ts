@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/auth";
 import { getPrisma } from "@/lib/db";
 import { AppError, withRouteErrorHandling } from "@/lib/errors";
 import { enqueueReviewExecution } from "@/server/job-queue";
+import { assertPromptAccess } from "@/server/prompt-access";
 import { createReview } from "@/server/reviews";
 
 export const runtime = "nodejs";
@@ -11,6 +12,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   return withRouteErrorHandling(async () => {
     const user = await requireCurrentUser();
+    assertPromptAccess(user.email);
     const review = await createReview(user.id, await readJsonBody(request));
     try {
       await enqueueReviewExecution({ userId: user.id, reviewId: review.id });

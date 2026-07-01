@@ -32,6 +32,9 @@ replaced in the same unreleased development cycle.
 
 ### Changed
 
+- AI review prompting is restricted server-side to the owner account while
+  sign-up, login, repository access, and sandbox browsing remain available to
+  other authenticated users.
 - The production image now copies only Next.js standalone output, static
   assets, worker source, migrations, and production dependencies instead of
   duplicating the full builder tree and build cache into the runtime layer.
