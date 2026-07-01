@@ -32,6 +32,9 @@ replaced in the same unreleased development cycle.
 
 ### Changed
 
+- Docker builds exclude raw Codex JSONL exports and use one Next.js build
+  worker, keeping submission artifacts out of production images and avoiding
+  static-generation memory spikes on the Oracle host.
 - Vercel Sandbox authentication failures now surface an actionable credential
   error instead of the generic sandbox-execution failure.
 - AI review prompting is restricted server-side to the owner account while
